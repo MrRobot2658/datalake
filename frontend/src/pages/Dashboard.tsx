@@ -1,0 +1,94 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Filter, Workflow, ArrowRight } from "lucide-react";
+import Layout from "../components/layout/Layout";
+import { Card, Spinner } from "../components/ui";
+import { OBJECTS, byKey } from "../lib/objects";
+import { searchObjects, listTags, listSegments } from "../api/client";
+import { useTenant } from "../context/TenantContext";
+
+const COUNTED = ["user", "account", "product", "store"];
+
+export default function Dashboard() {
+  const { tenant } = useTenant();
+  const [counts, setCounts] = useState<Record<string, number | null>>({});
+
+  useEffect(() => {
+    let alive = true;
+    setCounts({});
+    const tasks: Promise<void>[] = COUNTED.map(async (k) => {
+      try {
+        const r = await searchObjects({ tenant_id: tenant, object: k, count_only: true });
+        if (alive) setCounts((c) => ({ ...c, [k]: r.estimate ?? r.row_count ?? 0 }));
+      } catch {
+        if (alive) setCounts((c) => ({ ...c, [k]: -1 }));
+      }
+    });
+    tasks.push(
+      listTags(tenant).then((t) => { if (alive) setCounts((c) => ({ ...c, tag: t.length })); }).catch(() => {}),
+      listSegments(tenant).then((s) => { if (alive) setCounts((c) => ({ ...c, segment: s.length })); }).catch(() => {}),
+    );
+    return () => { alive = false; };
+  }, [tenant]);
+
+  const cards = [...COUNTED, "tag", "segment"];
+
+  return (
+    <Layout title="概览">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+        {cards.map((k) => {
+          const cfg = byKey(k)!;
+          const v = counts[k];
+          return (
+            <Link key={k} to={`/objects/${k}`}>
+              <Card className="p-4 transition-shadow hover:shadow-md">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+                  <cfg.icon className="h-5 w-5" />
+                </div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {v === undefined ? <span className="text-gray-300">—</span> : v === -1 ? "?" : v}
+                </div>
+                <div className="text-sm text-gray-500">{cfg.label}</div>
+              </Card>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <Link to="/filter">
+          <Card className="flex items-center justify-between p-6 transition-shadow hover:shadow-md">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-500 text-white">
+                <Filter className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">统一筛选器</div>
+                <div className="text-sm text-gray-500">多条件 / 跨对象 / 自然语言圈人</div>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-gray-300" />
+          </Card>
+        </Link>
+        <Link to="/etl">
+          <Card className="flex items-center justify-between p-6 transition-shadow hover:shadow-md">
+            <div className="flex items-center gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500 text-white">
+                <Workflow className="h-6 w-6" />
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">可视化 ETL</div>
+                <div className="text-sm text-gray-500">多数据源 → 导入多对象</div>
+              </div>
+            </div>
+            <ArrowRight className="h-5 w-5 text-gray-300" />
+          </Card>
+        </Link>
+      </div>
+
+      {Object.keys(counts).length < cards.length && (
+        <div className="mt-4 flex items-center gap-2 text-sm text-gray-400"><Spinner /> 统计加载中…</div>
+      )}
+    </Layout>
+  );
+}
