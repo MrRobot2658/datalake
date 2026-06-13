@@ -72,6 +72,31 @@ export async function confirmSegment(
   return data;
 }
 
+// ETL
+export interface EtlFieldMap { target: string; source?: string; const?: any }
+export interface EtlBody {
+  tenant_id: number;
+  target_object: string;
+  source: { type: string; csv?: string; rows?: any[]; delimiter?: string };
+  mapping: EtlFieldMap[];
+  link?: { rel_type: string; dst_type: string; dst_id_source: string };
+  limit_preview?: number;
+}
+export async function etlPreview(body: EtlBody) {
+  const { data } = await http.post(`/etl/preview`, body);
+  return data as {
+    target_object: string; total_rows: number; source_columns: string[];
+    preview: Record<string, any>[]; issues: string[];
+  };
+}
+export async function etlImport(body: EtlBody) {
+  const { data } = await http.post(`/etl/import`, body);
+  return data as {
+    target_object: string; total_rows: number; imported: number;
+    relations: number; failed: number; errors: { row: number; error: string }[];
+  };
+}
+
 // 标签 / 群组(segment)
 export async function listTags(tenant: number) {
   const { data } = await http.get(`/tags/${tenant}`);

@@ -199,6 +199,34 @@ class ObjectUpsertRequest(BaseModel):
     record: dict = Field(..., examples=[{"lead_id": "L9001", "city": "上海", "company_size": 600}])
 
 
+class EtlSource(BaseModel):
+    type: str = Field("inline", examples=["csv", "inline"], description="csv/inline；mysql/kafka/api 路线图")
+    csv: str | None = Field(None, description="csv 文本(含表头)")
+    rows: list[dict] | None = Field(None, description="inline 已解析行")
+    delimiter: str = Field(",", description="csv 分隔符")
+
+
+class EtlFieldMap(BaseModel):
+    target: str = Field(..., examples=["product_id"], description="目标对象字段")
+    source: str | None = Field(None, examples=["id"], description="源列名")
+    const: Any | None = Field(None, description="常量(与 source 二选一)")
+
+
+class EtlLink(BaseModel):
+    rel_type: str = Field(..., examples=["placed"])
+    dst_type: str = Field(..., examples=["order"])
+    dst_id_source: str = Field(..., examples=["order_id"], description="目标 id 取自源列")
+
+
+class EtlRequest(BaseModel):
+    tenant_id: int = Field(..., examples=[1001])
+    target_object: str = Field(..., examples=["product"])
+    source: EtlSource
+    mapping: list[EtlFieldMap] = Field(default_factory=list)
+    link: EtlLink | None = None
+    limit_preview: int = Field(5, ge=1, le=50)
+
+
 class RelationAddRequest(BaseModel):
     tenant_id: int = Field(..., examples=[1001])
     src_type: str = Field(..., examples=["lead"])

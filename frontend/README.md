@@ -11,7 +11,9 @@ TailAdmin 风格的 React + Vite + Tailwind 前端，对接 `sql-engine`。
 - **存为群组**：基于当前筛选规则一键保存为 Segment（`/agent/segment/confirm`，自动校验 + 预估）。
 - **对象页**：用户 / 客户 / 商品 / 门店 / **订单**（接 `/objects/search`）、用户标签（`/tags`）、
   用户群组（`/segments`）。
-- **可视化 ETL**：多数据源 → 导入多对象的交互原型（ETL 引擎待补）。
+- **可视化 ETL**：多数据源（CSV/粘贴、inline 可运行；MySQL/Kafka/API 路线图）→ 字段映射
+  （自动匹配）→ 预览（干跑）→ 导入多对象（`/etl/preview`、`/etl/import`）→ 一键去筛选；
+  支持导入时建立关系（如订单→含→商品）。
 
 ## 开发
 

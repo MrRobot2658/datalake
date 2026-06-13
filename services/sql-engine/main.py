@@ -12,6 +12,7 @@ from fastapi.openapi.utils import get_openapi
 from agent import NlSegmentAgent
 from dsl import DslEngine
 from engine import SqlEngine
+from etl import EtlService
 from executor import create_executor
 from groups import GroupService
 from nl_query import NlQueryPlanner
@@ -28,6 +29,7 @@ from schemas import (
     MemberResponse,
     AgentConfirmRequest,
     AgentDraftRequest,
+    EtlRequest,
     NlQueryRequest,
     NlQueryResponse,
     ObjectSearchRequest,
@@ -65,6 +67,7 @@ object_service = ObjectService(executor if hasattr(executor, "config") else None
 dsl_engine = DslEngine(object_service)
 segment_service = SegmentService(executor if hasattr(executor, "config") else None)
 nl_agent = NlSegmentAgent(dsl_engine, object_service)
+etl_service = EtlService(object_service)
 
 ROOT_PATH = os.getenv("ROOT_PATH", "")
 
@@ -346,6 +349,31 @@ def search_objects(body: ObjectSearchRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"对象筛选失败: {e}")
+
+
+# ── 可视化 ETL（多源 → 字段映射 → 导入多对象 → 进筛选）──────────────────────
+
+@app.post("/etl/preview", tags=["ETL"])
+def etl_preview(body: EtlRequest):
+    """干跑：解析源 + 映射前 N 行，返回样例记录与校验问题，不写库。"""
+    try:
+        return etl_service.preview(
+            body.tenant_id, body.target_object, body.source.model_dump(),
+            [m.model_dump() for m in body.mapping], body.limit_preview)
+    except ObjectError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/etl/import", tags=["ETL"])
+def etl_import(body: EtlRequest):
+    """执行导入：逐行 upsert 到目标对象（可选建关系），错误按行返回。"""
+    try:
+        return etl_service.run_import(
+            body.tenant_id, body.target_object, body.source.model_dump(),
+            [m.model_dump() for m in body.mapping],
+            body.link.model_dump() if body.link else None)
+    except ObjectError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ── 元数据（Filter Engine 代理）──────────────────────────────────────────
