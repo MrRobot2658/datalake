@@ -39,6 +39,11 @@ OBJECT_REGISTRY: dict[str, dict] = {
         "table": "object_store", "id": "store_id", "id_numeric": False,
         "fields": {"store_id": "str", "store_name": "str", "region": "str", "address": "str"},
     },
+    "order": {
+        "table": "object_order", "id": "order_id", "id_numeric": False,
+        "fields": {"order_id": "str", "order_no": "str", "amount": "float",
+                   "channel": "str", "status": "str"},
+    },
 }
 
 # 操作符白名单 → SQL 片段构造器
@@ -53,6 +58,8 @@ RELATION_MATRIX = {
     ("user", "owns", "account"),
     ("account", "purchased", "product"),
     ("user", "visited", "store"),
+    ("user", "placed", "order"),       # 用户下单
+    ("order", "contains", "product"),  # 订单含商品
 }
 
 # 关系边(object_relations.properties JSON)上的已知键：喂给 NL/schema，避免 LLM 编造键名。
@@ -67,6 +74,12 @@ RELATION_PROPERTIES: dict[tuple, dict] = {
     ("user", "visited", "store"): {
         "channel": {"type": "str", "label": "到访渠道，如 app/mini/offline"},
         "duration": {"type": "int", "label": "停留时长(秒)"},
+    },
+    ("user", "placed", "order"): {
+        "channel": {"type": "str", "label": "下单渠道，如 app/web/store"},
+    },
+    ("order", "contains", "product"): {
+        "quantity": {"type": "int", "label": "购买数量"},
     },
 }
 

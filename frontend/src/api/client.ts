@@ -57,6 +57,21 @@ export async function draftSegment(
   return data;
 }
 
+export async function confirmSegment(
+  tenant: number,
+  segment_code: string,
+  segment_name: string,
+  rule: DslRule,
+): Promise<any> {
+  const { data } = await http.post(`/agent/segment/confirm`, {
+    tenant_id: tenant,
+    segment_code,
+    segment_name,
+    rule,
+  });
+  return data;
+}
+
 // 标签 / 群组(segment)
 export async function listTags(tenant: number) {
   const { data } = await http.get(`/tags/${tenant}`);

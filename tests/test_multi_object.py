@@ -19,16 +19,18 @@ def search(payload: dict) -> dict:
 
 
 class TestObjectMeta:
-    def test_meta_lists_five_objects(self):
+    def test_meta_lists_objects(self):
         data = S.get(f"{API}/objects/meta", timeout=5).json()
         objs = {o["object"] for o in data["objects"]}
-        assert objs == {"user", "lead", "account", "product", "store"}
+        assert {"user", "lead", "account", "product", "store", "order"}.issubset(objs)
 
     def test_meta_relation_matrix(self):
         data = S.get(f"{API}/objects/meta", timeout=5).json()
         rels = {(r["src_type"], r["rel_type"], r["dst_type"]) for r in data["relations"]}
         assert ("lead", "belongs_to", "user") in rels
         assert ("account", "purchased", "product") in rels
+        assert ("user", "placed", "order") in rels
+        assert ("order", "contains", "product") in rels
 
 
 class TestCrossObjectFilter:
@@ -91,6 +93,31 @@ class TestValidation:
         resp = search({"object": "lead",
                        "relations": [{"rel_type": "purchased", "object": "product"}]})
         assert resp.status_code == 400
+
+
+class TestOrderObject:
+    """订单对象 + user→placed→order→contains→product 链路。"""
+
+    def test_order_base_filter(self):
+        resp = search({"object": "order", "conditions": [{"field": "status", "op": "eq", "value": "paid"}]})
+        assert resp.status_code == 200
+        assert resp.json()["row_count"] >= 2
+
+    def test_user_placed_order_amount(self):
+        """下过单(金额>1000)的用户 — placed 边 + order 条件。"""
+        resp = search({"object": "user", "count_only": True, "relations": [
+            {"rel_type": "placed", "object": "order",
+             "conditions": [{"field": "amount", "op": "gt", "value": 1000}]}]})
+        assert resp.status_code == 200
+        assert resp.json()["estimate"] >= 1
+
+    def test_user_order_product_three_hop(self):
+        """三跳：user→placed→order→contains→product，锚点逐跳推进。"""
+        resp = search({"object": "user", "count_only": True, "relations": [
+            {"rel_type": "placed", "object": "order", "relations": [
+                {"rel_type": "contains", "object": "product"}]}]})
+        assert resp.status_code == 200
+        assert "r2.src_id=u1.order_id" in resp.json()["sql"]
 
 
 class TestChainedMultiHop:

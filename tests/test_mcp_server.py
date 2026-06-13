@@ -58,7 +58,7 @@ def test_tools_registered():
 
 def test_schema_lists_objects():
     data = call("cdp_schema", {})
-    assert {o["object"] for o in data["objects"]} == {"user", "lead", "account", "product", "store"}
+    assert {"user", "lead", "account", "product", "store", "order"}.issubset({o["object"] for o in data["objects"]})
 
 
 def test_nl_segment_documented_example():

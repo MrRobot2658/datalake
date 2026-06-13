@@ -65,6 +65,22 @@ CREATE TABLE IF NOT EXISTS object_store (
     INDEX idx_region (tenant_id, region)
 ) ENGINE=InnoDB COMMENT='对象·门店';
 
+-- ── Order 订单 ───────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS object_order (
+    tenant_id       BIGINT       NOT NULL,
+    order_id        VARCHAR(64)  NOT NULL,
+    order_no        VARCHAR(64),
+    amount          DECIMAL(12,2) DEFAULT 0,
+    channel         VARCHAR(32)  COMMENT 'app/web/store',
+    status          VARCHAR(32)  COMMENT 'paid/refunded/pending/cancelled',
+    properties      JSON,
+    create_time     DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (tenant_id, order_id),
+    INDEX idx_status (tenant_id, status),
+    INDEX idx_channel (tenant_id, channel)
+) ENGINE=InnoDB COMMENT='对象·订单';
+
 -- ── object_relations 统一关联存储（文档图 6 关联矩阵）────────────────────
 -- 关系方向：src --rel_type--> dst。user 主键存 one_id 的字符串形式。
 -- 已定义关系：lead-belongs_to->user、user-owns->account、
@@ -123,6 +139,12 @@ INSERT IGNORE INTO object_store (tenant_id, store_id, store_name, region, addres
     (1001, 'S5001', '上海旗舰店', '华东', '上海市浦东新区世纪大道100号'),
     (1001, 'S5002', '北京体验店', '华北', '北京市朝阳区建国路88号');
 
+-- Order（演示：含已支付/退款，金额/渠道/状态各异）
+INSERT IGNORE INTO object_order (tenant_id, order_id, order_no, amount, channel, status) VALUES
+    (1001, 'O90001', 'NO-20260613-001', 1299.00, 'app',   'paid'),
+    (1001, 'O90002', 'NO-20260612-002',  459.00, 'web',   'paid'),
+    (1001, 'O90003', 'NO-20260530-003',   88.00, 'store', 'refunded');
+
 -- 关联边
 INSERT IGNORE INTO object_relations (tenant_id, src_type, src_id, rel_type, dst_type, dst_id) VALUES
     -- lead belongs_to user
@@ -139,4 +161,12 @@ INSERT IGNORE INTO object_relations (tenant_id, src_type, src_id, rel_type, dst_
     (1001, 'account', 'A3001', 'purchased', 'product', 'P4002'),
     -- user visited store
     (1001, 'user', '100002', 'visited', 'store', 'S5001'),
-    (1001, 'user', '100004', 'visited', 'store', 'S5002');
+    (1001, 'user', '100004', 'visited', 'store', 'S5002'),
+    -- user placed order
+    (1001, 'user', '100002', 'placed', 'order', 'O90001'),
+    (1001, 'user', '100002', 'placed', 'order', 'O90002'),
+    (1001, 'user', '100004', 'placed', 'order', 'O90003'),
+    -- order contains product
+    (1001, 'order', 'O90001', 'contains', 'product', 'P4001'),
+    (1001, 'order', 'O90002', 'contains', 'product', 'P4002'),
+    (1001, 'order', 'O90003', 'contains', 'product', 'P4001');

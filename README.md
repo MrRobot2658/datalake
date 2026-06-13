@@ -55,8 +55,8 @@
 | Redis 7 | 6381 | OneID 热缓存 |
 | Kafka | 9094 | 多租户事件总线 |
 | Kafka UI | 8083 | Topic 可视化 |
-| **Nginx 网关** | **8080** | **首页 + 用户应用 + API 路由代理** |
-| **用户应用** | **8080/app/** | **用户列表 / 群组 / 标签 + 创建 + 导入 + 自然语义搜索** |
+| **Nginx 网关** | **8080** | **首页 + CDP 控制台 + API 路由代理** |
+| **CDP 控制台** | **8080/console/** | **多对象 / 统一筛选器 / 跨对象多条线 / 自然语言圈人 / 存为群组 / 可视化 ETL（React，见 [frontend/](./frontend/README.md)）** |
 | ID-Mapping | 8001 | 实时合并服务 API |
 | SQL Engine | 8002 | OLAP 查询层（模板 SQL + 参数拼装，与 Doris 解耦） |
 
@@ -65,7 +65,7 @@
 | 路径 | 目标 |
 |------|------|
 | `/` | 首页（服务导航） |
-| `/app/` | 用户应用（列表 / 群组 / 标签 / 创建 / 导入） |
+| `/console/` | CDP 圈人控制台（React SPA；`/api/*` 反代到 SQL Engine） |
 | `/ID-Mapping` | ID-Mapping Swagger → `/docs` |
 | `/SQL Engine` | SQL Engine Swagger → `/docs` |
 | `/nl-query` 等 | SQL Engine API 根路径直通（Swagger Try it out 兼容） |

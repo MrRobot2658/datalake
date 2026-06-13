@@ -2,7 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // 开发态把 /api 代理到 sql-engine（避免跨域）；生产由 nginx 同源转发。
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // 生产(build)挂在网关 /console/ 下；dev 仍是根路径
+  base: command === "build" ? "/console/" : "/",
   plugins: [react()],
   server: {
     port: 5173,
@@ -14,4 +16,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

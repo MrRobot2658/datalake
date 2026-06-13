@@ -4,7 +4,6 @@ import UnifiedFilter from "../components/filter/UnifiedFilter";
 import { byKey } from "../lib/objects";
 import TagsPage from "./TagsPage";
 import SegmentsPage from "./SegmentsPage";
-import OrdersPage from "./OrdersPage";
 
 export default function ObjectListPage() {
   const { key = "user" } = useParams();
@@ -13,7 +12,6 @@ export default function ObjectListPage() {
 
   if (cfg.kind === "tag") return <TagsPage />;
   if (cfg.kind === "segment") return <SegmentsPage />;
-  if (cfg.kind === "mock") return <OrdersPage />;
 
   return (
     <Layout title={cfg.label}>

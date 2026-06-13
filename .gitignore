@@ -9,3 +9,6 @@ __pycache__/
 .DS_Store
 *.log
 services/mcp/logs/
+
+# Claude Code 本地设置(机器相关，不入库)
+.claude/settings.local.json

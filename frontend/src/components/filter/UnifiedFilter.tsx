@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Calculator, Sparkles, Code2 } from "lucide-react";
+import { Plus, Search, Calculator, Sparkles, Code2, Save } from "lucide-react";
 import { useTenant } from "../../context/TenantContext";
-import { getMetadata, searchObjects, estimate, draftSegment } from "../../api/client";
+import { getMetadata, searchObjects, estimate, draftSegment, confirmSegment } from "../../api/client";
 import type { DslRule, Metadata, Relation } from "../../api/types";
 import { OBJECTS, byKey } from "../../lib/objects";
-import { Card, Button, Badge, Spinner, DataTable } from "../ui";
+import { Card, Button, Badge, Spinner, DataTable, Modal, TextField } from "../ui";
 import ConditionEditor, { type FieldOption } from "./ConditionEditor";
 import RelationEditor from "./RelationEditor";
 
@@ -23,6 +23,10 @@ export default function UnifiedFilter({ baseObject, lockBase, autoSearch }: { ba
   const [rows, setRows] = useState<Record<string, any>[] | null>(null);
   const [showSql, setShowSql] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [saveCode, setSaveCode] = useState("");
+  const [saveName, setSaveName] = useState("");
+  const [saveMsg, setSaveMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   useEffect(() => {
     getMetadata(tenant).then(setMeta).catch((e) => setErr(String(e)));
@@ -93,6 +97,21 @@ export default function UnifiedFilter({ baseObject, lockBase, autoSearch }: { ba
     } finally { setBusy(null); }
   }
 
+  async function runSave() {
+    if (!saveCode.trim() || !saveName.trim()) {
+      setSaveMsg({ kind: "err", text: "请填写群组编码和名称" });
+      return;
+    }
+    setBusy("save"); setSaveMsg(null);
+    try {
+      await confirmSegment(tenant, saveCode.trim(), saveName.trim(), rule);
+      setSaveMsg({ kind: "ok", text: `已保存群组「${saveName.trim()}」` });
+      setTimeout(() => { setSaveOpen(false); setSaveMsg(null); setSaveCode(""); setSaveName(""); }, 1200);
+    } catch (e: any) {
+      setSaveMsg({ kind: "err", text: detail(e) });
+    } finally { setBusy(null); }
+  }
+
   if (err && !meta) return <Card className="p-6 text-sm text-red-600">加载元数据失败：{err}</Card>;
   if (!meta) return <div className="flex items-center gap-2 text-gray-500"><Spinner /> 加载中…</div>;
 
@@ -141,6 +160,9 @@ export default function UnifiedFilter({ baseObject, lockBase, autoSearch }: { ba
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={runEstimate} disabled={!!busy}>
               {busy === "est" ? <Spinner /> : <Calculator className="h-4 w-4" />} 预估人数
+            </Button>
+            <Button variant="outline" onClick={() => { setSaveMsg(null); setSaveOpen(true); }} disabled={!!busy}>
+              <Save className="h-4 w-4" /> 存为群组
             </Button>
             <Button onClick={runSearch} disabled={!!busy}>
               {busy === "search" ? <Spinner /> : <Search className="h-4 w-4" />} 查询
@@ -206,6 +228,28 @@ export default function UnifiedFilter({ baseObject, lockBase, autoSearch }: { ba
           <DataTable columns={rows[0] ? Object.keys(rows[0]).slice(0, 8) : ["结果"]} rows={rows} />
         </Card>
       )}
+
+      {/* 存为群组 */}
+      <Modal open={saveOpen} title="存为用户群组 / Segment" onClose={() => setSaveOpen(false)}>
+        <div className="space-y-3">
+          <div className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            基于当前筛选规则保存（base 对象：<b>{byKey(rule.object)?.label}</b>）。保存前会自动校验 + 预估人数。
+          </div>
+          <TextField label="群组编码（英文/数字/_/-）" value={saveCode} onChange={setSaveCode} placeholder="如 recent_buyers_30d" />
+          <TextField label="群组名称" value={saveName} onChange={setSaveName} placeholder="如 近30天购买用户" />
+          {saveMsg && (
+            <div className={`rounded-lg px-3 py-2 text-sm ${saveMsg.kind === "ok" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>
+              {saveMsg.text}
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setSaveOpen(false)}>取消</Button>
+            <Button onClick={runSave} disabled={busy === "save"}>
+              {busy === "save" ? <Spinner /> : <Save className="h-4 w-4" />} 保存
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

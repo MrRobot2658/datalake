@@ -7,7 +7,7 @@ import { OBJECTS, byKey } from "../lib/objects";
 import { searchObjects, listTags, listSegments } from "../api/client";
 import { useTenant } from "../context/TenantContext";
 
-const COUNTED = ["user", "account", "product", "store"];
+const COUNTED = ["user", "account", "order", "product", "store"];
 
 export default function Dashboard() {
   const { tenant } = useTenant();
@@ -35,7 +35,7 @@ export default function Dashboard() {
 
   return (
     <Layout title="概览">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-7">
         {cards.map((k) => {
           const cfg = byKey(k)!;
           const v = counts[k];
