@@ -57,6 +57,7 @@ from privacy_api import router as privacy_router
 from monitor_api import router as monitor_router
 from settings_api import router as settings_router
 from auth_api import router as auth_router
+from scheduler_api import router as scheduler_router
 
 TAGS = [
     {"name": "系统", "description": "健康检查"},
@@ -507,6 +508,7 @@ app.include_router(privacy_router)
 app.include_router(monitor_router)
 app.include_router(settings_router)
 app.include_router(auth_router)
+app.include_router(scheduler_router)
 
 
 def custom_openapi():

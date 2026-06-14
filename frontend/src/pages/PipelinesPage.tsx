@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Route as RouteIcon, Plus, Play, Workflow } from "lucide-react";
+import { Route as RouteIcon, Plus, Play, Workflow, ExternalLink, CheckCircle2, XCircle } from "lucide-react";
 import Layout from "../components/layout/Layout";
 import { Card, Button, Spinner, Modal, TextField } from "../components/ui";
 import { StatCards, StatusPill, EmptyState } from "../components/segment/kit";
 import { useTenant } from "../context/TenantContext";
 import { useLang } from "../context/LangContext";
-import { listPipelines, createPipeline, executePipeline, type Pipeline } from "../api/connections";
+import { listPipelines, createPipeline, executePipeline, schedulerHealth, type Pipeline, type SchedulerInfo } from "../api/connections";
 
 function tone(s: string) {
   if (s === "active" || s === "running") return "green" as const;
@@ -23,12 +23,14 @@ export default function PipelinesPage() {
   const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [msg, setMsg] = useState<Record<string, string>>({});
+  const [sched, setSched] = useState<SchedulerInfo | null>(null);
 
   function load() {
     setItems(null); setErr(null);
     listPipelines(tenant).then(setItems).catch((e) => setErr(String(e)));
   }
   useEffect(load, [tenant]);
+  useEffect(() => { schedulerHealth().then(setSched).catch(() => setSched({ reachable: false })); }, []);
 
   async function submit() {
     if (!name.trim()) return;
@@ -43,7 +45,13 @@ export default function PipelinesPage() {
     setMsg((m) => ({ ...m, [p.pipeline_id]: tr("执行中…", "Running…") }));
     try {
       const r = await executePipeline(tenant, p.pipeline_id);
-      setMsg((m) => ({ ...m, [p.pipeline_id]: `${r.status} · ~${r.estimated_duration_ms}ms` }));
+      const dr = r.scheduler?.dag_run;
+      const txt = dr
+        ? tr(`已触发 Airflow · ${dr.dag_run_id}`, `Triggered on Airflow · ${dr.dag_run_id}`)
+        : (r.scheduler && !r.scheduler.reachable
+            ? tr("调度器不可达（本地模拟）", "Scheduler unreachable (local sim)")
+            : `${r.status}`);
+      setMsg((m) => ({ ...m, [p.pipeline_id]: txt }));
       load();
     } catch (e) { setMsg((m) => ({ ...m, [p.pipeline_id]: String(e) })); }
   }
@@ -59,6 +67,26 @@ export default function PipelinesPage() {
         </>
       }
     >
+      {sched && (
+        <div className={`mb-4 flex items-center justify-between rounded-lg border px-4 py-2.5 text-sm ${
+          sched.reachable ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+          <div className="flex items-center gap-2">
+            {sched.reachable ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+            <span className="font-medium">{tr("调度器 Airflow", "Scheduler · Airflow")}</span>
+            <span className="text-xs opacity-80">
+              {sched.reachable
+                ? tr(`已连接 · scheduler ${sched.scheduler ?? "?"} · DAG ${sched.dag_id ?? ""}`, `Connected · scheduler ${sched.scheduler ?? "?"} · DAG ${sched.dag_id ?? ""}`)
+                : tr("未连接（运行将本地模拟）", "Not connected (runs fall back to local sim)")}
+            </span>
+          </div>
+          {sched.ui_url && (
+            <a href={sched.ui_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium hover:underline">
+              {tr("打开 Airflow", "Open Airflow")} <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+        </div>
+      )}
+
       {items && (
         <StatCards items={[
           { label: tr("管道总数", "Total Pipelines"), value: items.length },

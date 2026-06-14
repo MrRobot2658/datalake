@@ -650,20 +650,34 @@ class ConnectionsService:
     def execute_pipeline(self, tenant_id: int, pipeline_id: str, body: PipelineExecuteRequest) -> dict:
         with self._conn() as conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT pipeline_id FROM connections_pipelines WHERE tenant_id=%s AND pipeline_id=%s",
+                "SELECT pipeline_name, nodes, edges FROM connections_pipelines "
+                "WHERE tenant_id=%s AND pipeline_id=%s",
                 (tenant_id, pipeline_id),
             )
-            if not cur.fetchone():
+            row = cur.fetchone()
+            if not row:
                 raise HTTPException(status_code=404, detail="管道不存在")
             cur.execute(
                 """
                 UPDATE connections_pipelines
-                SET last_executed_time=NOW(), execution_count=execution_count+1
+                SET last_executed_time=NOW(), execution_count=execution_count+1, status='running'
                 WHERE tenant_id=%s AND pipeline_id=%s
                 """,
                 (tenant_id, pipeline_id),
             )
-        return {"execution_id": self._nid("exec"), "status": "pending", "estimated_duration_ms": 1500}
+        row = self._normalize(row)
+        result = {"execution_id": self._nid("exec"), "status": "pending", "estimated_duration_ms": 1500}
+        # 推送到 Airflow 真实运行；调度器不可用时降级为本地模拟（不报错）
+        try:
+            from scheduler_api import deploy_and_run
+            result["scheduler"] = deploy_and_run(
+                tenant_id, row.get("pipeline_name") or pipeline_id,
+                row.get("nodes") or [], row.get("edges") or [], run=True,
+            )
+            result["status"] = "running"
+        except Exception as e:  # noqa: BLE001
+            result["scheduler"] = {"reachable": False, "error": str(e)}
+        return result
 
 
 # ════════════════════════════════════════════════════════════════════════

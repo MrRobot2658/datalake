@@ -11,10 +11,12 @@ import {
   Boxes, Megaphone, Webhook, Warehouse,
   Trash2, Save, Sparkles, type LucideIcon,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import Layout from "../components/layout/Layout";
 import { Button } from "../components/ui";
-import { MockTag } from "../components/segment/kit";
 import { useLang } from "../context/LangContext";
+import { useTenant } from "../context/TenantContext";
+import { createPipeline } from "../api/connections";
 import { CONNECTORS } from "../lib/connectors";
 
 type Tr = (zh: string, en?: string) => string;
@@ -147,6 +149,25 @@ function FlowCanvas() {
   const clear = () => { setNodes([]); setEdges([]); };
   const loadSeed = () => { setNodes(SEED_NODES); setEdges(SEED_EDGES); };
 
+  const { tenant } = useTenant();
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  async function saveAsPipeline() {
+    setSaving(true); setSaveMsg(null);
+    try {
+      const pnodes = nodes.map((n) => {
+        const d = n.data as unknown as { label?: string; term?: string; kind?: string };
+        return { id: n.id, label: d?.label, type: d?.term, kind: d?.kind };
+      });
+      const pedges = edges.map((e) => ({ source: e.source, target: e.target }));
+      const name = tr(`画布流程 · ${pnodes.length} 节点`, `Canvas flow · ${pnodes.length} nodes`) + ` · ${Date.now().toString().slice(-5)}`;
+      const r = await createPipeline(tenant, { pipeline_name: name, nodes: pnodes, edges: pedges, status: "draft" });
+      setSaveMsg(tr(`已保存：${r.pipeline_name}`, `Saved: ${r.pipeline_name}`));
+    } catch (e) {
+      setSaveMsg(String(e));
+    } finally { setSaving(false); }
+  }
+
   return (
     <div className="flex h-[680px] overflow-hidden rounded-xl border border-gray-200 bg-white shadow-card">
       {/* 左侧：可拖拽节点面板 */}
@@ -184,13 +205,21 @@ function FlowCanvas() {
 
       {/* 右侧：流程画布 */}
       <div className="relative flex-1" ref={wrapper}>
-        <div className="absolute left-3 top-3 z-10 flex gap-2">
+        <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
           <Button variant="outline" onClick={loadSeed} className="!py-1.5 !text-xs">
             <Sparkles className="h-3.5 w-3.5" /> {tr("示例流程", "Example flow")}
           </Button>
           <Button variant="outline" onClick={clear} className="!py-1.5 !text-xs">
             <Trash2 className="h-3.5 w-3.5" /> {tr("清空", "Clear")}
           </Button>
+          <Button onClick={saveAsPipeline} disabled={saving || nodes.length === 0} className="!py-1.5 !text-xs">
+            <Save className="h-3.5 w-3.5" /> {saving ? tr("保存中…", "Saving…") : tr("保存为管道", "Save as Pipeline")}
+          </Button>
+          {saveMsg && (
+            <span className="rounded bg-white/90 px-2 py-1 text-xs text-gray-600 shadow-sm">
+              {saveMsg} <Link to="/connections/pipelines" className="font-medium text-brand-600 hover:underline">{tr("去运行", "Run it")}</Link>
+            </span>
+          )}
         </div>
         <ReactFlow
           nodes={nodes}
@@ -216,18 +245,14 @@ function FlowCanvas() {
 
 export default function EtlFlowPage() {
   const { tr } = useLang();
-  const [saved, setSaved] = useState(false);
   return (
     <Layout
       title={tr("可视化编排 Pipelines", "Pipelines")}
-      subtitle={tr("从数据源到目的地：左侧拖出节点，在画布上连线编排 ETL 流程（拖拽节点、连接把手、Backspace 删除）", "From sources to destinations: drag nodes from the left and connect them on the canvas to orchestrate ETL flows (drag nodes, connect handles, Backspace to delete)")}
+      subtitle={tr("从数据源到目的地编排 ETL；「保存为管道」后在管道页用 Airflow 运行", "Orchestrate ETL from sources to destinations; \"Save as Pipeline\" then run it on Airflow from the Pipelines page")}
       actions={
-        <>
-          <MockTag>{tr("未接后端", "No backend")}</MockTag>
-          <Button onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 1800); }}>
-            <Save className="h-4 w-4" /> {saved ? tr("已保存", "Saved") : tr("保存流程", "Save flow")}
-          </Button>
-        </>
+        <Link to="/connections/pipelines">
+          <Button variant="outline"><Save className="h-4 w-4" /> {tr("管道列表", "Pipelines")}</Button>
+        </Link>
       }
     >
       <ReactFlowProvider>

@@ -41,6 +41,7 @@
 
   ── 查询层（只读）── SQL Engine + 数据 Agent ← 业务应用 / MA / BI；模板查询 → Doris / Redis
   ── 调度管控层（K8s）── StreamPark：Flink Job 启停扩缩 · DolphinScheduler：离线导入/批标签/运维
+                          （dev 用 Apache Airflow 承载「可视化编排 Pipelines」的真实调度）
 ```
 
 **组件与端口**
@@ -54,6 +55,8 @@
 | MySQL 8 | 3308 | 业务库：id_mapping / user_profile / user_groups / merge_log / object_* |
 | Redis 7 | 6381 | OneID 热缓存 |
 | Kafka / Kafka UI | 9094 / 8083 | 多租户事件总线 / Topic 可视化 |
+| Airflow | 8088 | 可视化编排 Pipelines 的真实调度后端（admin/admin），SQL Engine 经其 REST API 触发 DAG |
+| 智能助手 assistant | 8004 | DeepSeek 对话 + 桥接 MCP + 后台任务 |
 
 **前端技术栈**：React 18 + Vite + TailwindCSS。数据链路：浏览器 `/api/*` → （dev: vite 代理 / 生产: nginx）→ **SQL Engine `:8002`** → **MySQL**，毫秒级实时查询。前端信息架构（IA）完全对标 Segment。
 
@@ -156,11 +159,23 @@ npm run dev                             # → http://localhost:5173/
 | AgenticDataHub 控制台（生产/网关） | http://localhost:8080/console/ |
 | SQL Engine Swagger | http://localhost:8002/docs |
 | ID-Mapping Swagger | http://localhost:8001/docs |
+| Airflow UI | http://localhost:8088/ · 账号 `admin` / `admin` |
 | MySQL | `localhost:3308` · db `agenticdatahub` · user `agenticdatahub` / `agenticdatahub123` |
 
 **真实 vs Mock**：带「Mock 数据」角标的页面是前端演示，未接后端、改动不落库。**真实数据页**（数据源导入、用户档案 Profiles、受众 Audiences、计算特征）走 SQL Engine→MySQL，操作即落库。
 
 **多租户**：顶栏 Workspace 下拉切换租户（1001/1002）；所有查询自动按 `tenant_id` 隔离。
+
+**可视化编排 Pipelines（Apache Airflow 调度）**
+
+「连接 › 可视化编排」拖拽节点连线 → **保存为管道**；在「管道 Pipelines」页点**执行**，SQL Engine 通过 Airflow REST API 触发 DAG 真实运行（管道页顶部有 Airflow 连接状态条 + 「打开 Airflow」入口）。
+
+- 调度后端：单容器 Airflow（scheduler + webserver，SQLite + SequentialExecutor），UI `http://localhost:8088`（`admin`/`admin`）。
+- 承载 DAG：`airflow/dags/agenticdatahub_pipeline.py` —— 一个**参数化通用 DAG**，所有管道运行共用；触发时把 `tenant_id / pipeline_name / 节点数` 放进 `dag_run.conf`，无需为每个管道单独建 DAG。
+- 接口：`POST /api/connections/pipelines/{id}/execute` 触发；`GET /api/connections/scheduler/health` 查连通性。Airflow 不可达时执行会**优雅降级**为本地模拟（不报错）。
+- 配置（`docker-compose.yml` 的 sql-engine 环境变量）：`AIRFLOW_API_URL` / `AIRFLOW_USER` / `AIRFLOW_PASSWORD` / `AIRFLOW_DAG_ID` / `AIRFLOW_UI_URL`。
+- 改/加 DAG：编辑 `airflow/dags/` 下的 py 文件（已挂载进容器），Airflow scheduler 约 30s 内自动加载。
+- 生产目标仍是 DolphinScheduler / StreamPark；Airflow 是 dev 下「可视化编排」的真实调度落地。
 
 **圈人规则**：统一筛选器支持 ① 多条件 + AND/OR ② 跨对象链式多跳关联（如 用户→下单→商品）③ 关系边条件 ④ 自然语言（中文描述 → DSL）。查询前可「预估人数」并预览生成的 SQL，满意后「存为受众」。
 

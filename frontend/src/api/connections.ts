@@ -275,7 +275,23 @@ export async function getPipeline(tenant: number, pipelineId: string): Promise<P
   return data;
 }
 
+export interface SchedulerInfo {
+  reachable: boolean;
+  scheduler?: string;
+  metadatabase?: string;
+  dag_id?: string;
+  ui_url?: string;
+  error?: string;
+  dag_run?: { dag_run_id: string; state: string | null };
+  engine?: string;
+}
+
 export async function executePipeline(tenant: number, pipelineId: string) {
   const { data } = await http.post(`/connections/pipelines/${pipelineId}/execute`, {}, { params: { tenant_id: tenant } });
-  return data as { execution_id: string; status: string; estimated_duration_ms: number };
+  return data as { execution_id: string; status: string; estimated_duration_ms: number; scheduler?: SchedulerInfo };
+}
+
+export async function schedulerHealth(): Promise<SchedulerInfo> {
+  const { data } = await http.get(`/connections/scheduler/health`);
+  return data;
 }

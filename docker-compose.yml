@@ -237,6 +237,42 @@ services:
       DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
       ROOT_PATH: "/SQL Engine"
+      # 可视化编排 Pipelines 对接的真实调度器（Apache Airflow）
+      AIRFLOW_API_URL: http://airflow:8080/api/v1
+      AIRFLOW_USER: ${AIRFLOW_USER:-admin}
+      AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-admin}
+      AIRFLOW_DAG_ID: ${AIRFLOW_DAG_ID:-agenticdatahub_pipeline}
+      AIRFLOW_UI_URL: ${AIRFLOW_UI_URL:-http://localhost:8088}
+    networks:
+      - agenticdatahub-net
+    restart: unless-stopped
+
+  # Apache Airflow（单容器 dev：scheduler + webserver，SQLite + 串行执行器）
+  # 作为可视化编排 Pipelines 的真实调度后端；UI 在 :8088（admin/admin），DAG: agenticdatahub_pipeline
+  airflow:
+    image: apache/airflow:2.9.3
+    container_name: agenticdatahub-airflow
+    ports:
+      - "8088:8080"
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      # 开启 REST API 的 basic-auth，供 sql-engine 触发 DAG
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_data:/opt/airflow
+    command:
+      - bash
+      - -c
+      - |
+        airflow db migrate
+        airflow users create --username admin --password admin \
+          --firstname a --lastname b --role Admin --email admin@example.com || true
+        airflow scheduler & exec airflow webserver
     networks:
       - agenticdatahub-net
     restart: unless-stopped
@@ -245,6 +281,7 @@ volumes:
   mysql_data:
   redis_data:
   frontend_dist:
+  airflow_data:
 
 networks:
   agenticdatahub-net:
