@@ -5,6 +5,7 @@
 """
 
 import requests
+import pytest
 from datetime import date, timedelta
 
 API = "http://localhost:8002"
@@ -12,6 +13,12 @@ API = "http://localhost:8002"
 S = requests.Session()
 S.trust_env = False
 TENANT = 1001
+
+
+@pytest.fixture(autouse=True)
+def _heal_demo(restore_demo_objects):
+    """每个用例前重灌 demo 确定性标签，避免被管道/其他用例污染跨对象断言。"""
+    yield
 
 
 def search(payload: dict) -> dict:

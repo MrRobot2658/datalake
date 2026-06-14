@@ -32,6 +32,12 @@ def _sql_engine_up() -> bool:
 pytestmark = pytest.mark.skipif(not _sql_engine_up(), reason="sql-engine 未就绪")
 
 
+@pytest.fixture(autouse=True)
+def _heal_demo(restore_demo_objects):
+    """每个用例前重灌 demo 确定性标签，避免跨对象断言被管道污染。"""
+    yield
+
+
 async def _run(tool: str, args: dict):
     params = StdioServerParameters(
         command=sys.executable,
