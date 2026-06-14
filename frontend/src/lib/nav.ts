@@ -36,7 +36,7 @@ export const SECTIONS: NavSection[] = [
     ],
   },
   {
-    label: "统一", term: "Unify", to: "/unify", icon: Users,
+    label: "用户", term: "Users", to: "/unify", icon: Users,
     children: [
       { label: "用户档案", term: "Profiles", to: "/unify", icon: UserSearch },
       { label: "身份解析", term: "Identity Resolution", to: "/unify/identity", icon: Fingerprint },
