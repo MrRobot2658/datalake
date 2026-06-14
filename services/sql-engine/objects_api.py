@@ -19,7 +19,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from executor import MysqlOlapExecutor
-from objects import OBJECT_REGISTRY, RELATION_MATRIX, ObjectService
+from objects import OBJECT_REGISTRY, RELATION_MATRIX, RELATION_PROPERTIES, ObjectService
 
 router = APIRouter(prefix="/objects", tags=["objects"])
 
@@ -424,6 +424,82 @@ class ObjectAdminService:
                 })
         return out
 
+    def _fields_for(self, tenant_id: int, object_key: str) -> list[dict]:
+        """某对象的自建字段（object_fields，含挂在内置对象上的扩展字段）。"""
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT field_code, field_type, field_label FROM object_fields "
+                "WHERE tenant_id=%s AND object_key=%s AND is_active=1 "
+                "ORDER BY sort_order, field_code",
+                (tenant_id, object_key),
+            )
+            return [{"code": r["field_code"], "type": r["field_type"], "label": r["field_label"]}
+                    for r in cur.fetchall()]
+
+    def _list_custom_relations(self, tenant_id: int) -> list[dict]:
+        """自建关系（relation_definitions）+ 其边属性；跳过与内置矩阵重复的。"""
+        out: list[dict] = []
+        with self._conn() as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT src_type, rel_type, dst_type, is_builtin FROM relation_definitions "
+                "WHERE tenant_id=%s",
+                (tenant_id,),
+            )
+            rels = list(cur.fetchall())
+            for rr in rels:
+                key = (rr["src_type"], rr["rel_type"], rr["dst_type"])
+                if key in RELATION_MATRIX:
+                    continue
+                cur.execute(
+                    "SELECT prop_key, prop_type, prop_label FROM relation_properties "
+                    "WHERE tenant_id=%s AND src_type=%s AND rel_type=%s AND dst_type=%s "
+                    "ORDER BY sort_order",
+                    (tenant_id, *key),
+                )
+                edge = {p["prop_key"]: {"type": p["prop_type"], "label": p["prop_label"]}
+                        for p in cur.fetchall()}
+                out.append({"src_type": rr["src_type"], "rel_type": rr["rel_type"],
+                            "dst_type": rr["dst_type"], "builtin": bool(rr["is_builtin"]),
+                            "edge_fields": edge})
+        return out
+
+    def full_model(self, tenant_id: int) -> dict:
+        """对象模型全景：内置 OBJECT_REGISTRY/RELATION_MATRIX 合并自建定义，供「对象模型」页渲染。"""
+        custom_defs = {d["object_key"]: d for d in self._list_definitions(tenant_id)}
+        objects: list[dict] = []
+        # 内置对象（含挂在其上的自建扩展字段）
+        for key, meta in OBJECT_REGISTRY.items():
+            builtin_codes = set(meta["fields"])
+            fields = [{"code": c, "type": t, "label": None, "builtin": True}
+                      for c, t in meta["fields"].items()]
+            for f in self._fields_for(tenant_id, key):
+                if f["code"] not in builtin_codes:
+                    fields.append({**f, "builtin": False})
+            objects.append({
+                "object": key, "label": (custom_defs.get(key) or {}).get("label"),
+                "table": meta["table"], "id": meta["id"],
+                "id_numeric": meta.get("id_numeric", False),
+                "builtin": True, "fields": fields,
+            })
+        # 自建对象
+        for okey, d in custom_defs.items():
+            if okey in OBJECT_REGISTRY:
+                continue
+            objects.append({
+                "object": okey, "label": d["label"], "table": d["table_name"],
+                "id": d["pk"], "id_numeric": False, "builtin": bool(d["is_builtin"]),
+                "fields": [{**f, "builtin": False} for f in self._fields_for(tenant_id, okey)],
+            })
+        # 关系：内置矩阵 + 自建关系
+        relations: list[dict] = []
+        for (s, r, d) in sorted(RELATION_MATRIX):
+            edge = {k: {"type": v.get("type"), "label": v.get("label")}
+                    for k, v in RELATION_PROPERTIES.get((s, r, d), {}).items()}
+            relations.append({"src_type": s, "rel_type": r, "dst_type": d,
+                              "builtin": True, "edge_fields": edge})
+        relations.extend(self._list_custom_relations(tenant_id))
+        return {"objects": objects, "relations": relations}
+
     # ── helpers ───────────────────────────────────────────────────────────
     def _json(self, v: Any) -> Any:
         if isinstance(v, str):
@@ -456,9 +532,14 @@ def _wrap(fn, *args):
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
-@router.get("/{tenant_id}/definitions", summary="加载租户对象定义（供 OBJECT_REGISTRY 合并）")
+@router.get("/{tenant_id}/definitions", summary="对象模型全景：内置+自建对象与关系（供「对象模型」页）")
 def list_definitions(tenant_id: int):
-    return {"tenant_id": tenant_id, "definitions": _wrap(_svc.list_definitions, tenant_id)}
+    # objects/relations 供「对象模型」页（内置+自建合并）；definitions 保留自建清单（向后兼容）
+    return {
+        "tenant_id": tenant_id,
+        "definitions": _wrap(_svc.list_definitions, tenant_id),
+        **_wrap(_svc.full_model, tenant_id),
+    }
 
 
 @router.post("/create", summary="创建新对象类型（建物理表 + 写注册表）")

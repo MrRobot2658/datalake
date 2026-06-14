@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { isValidElement, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -90,6 +90,7 @@ export function DataTable({ columns, rows, rowLink }: {
 
 function fmt(v: any) {
   if (v == null) return <span className="text-gray-300">—</span>;
+  if (isValidElement(v)) return v;                 // React 元素直接渲染（避免 JSON.stringify 循环引用崩溃）
   if (Array.isArray(v)) return v.join(", ");
   if (typeof v === "object") return JSON.stringify(v);
   return String(v);
