@@ -7,6 +7,7 @@ import {
   EyeOff, BadgeCheck, Trash2,
   Gauge, BellRing, ScrollText,
   Building2, KeyRound, History, ShoppingCart, Package, Store,
+  GitBranch, GitMerge,
   type LucideIcon,
 } from "lucide-react";
 
@@ -29,6 +30,7 @@ export const SECTIONS: NavSection[] = [
       { label: "可视化编排", term: "Pipelines", to: "/connections/flow", icon: Route },
       { label: "目的地", term: "Destinations", to: "/connections/destinations", icon: Download },
       { label: "Reverse ETL", term: "Reverse ETL", to: "/connections/reverse-etl", icon: RefreshCw },
+      { label: "管道", term: "Pipelines", to: "/connections/pipelines", icon: Route },
       { label: "数据仓库", term: "Warehouses", to: "/connections/warehouses", icon: Database },
       { label: "Functions", term: "Functions", to: "/connections/functions", icon: FunctionSquare },
     ],
@@ -39,6 +41,7 @@ export const SECTIONS: NavSection[] = [
       { label: "用户档案", term: "Profiles", to: "/unify", icon: UserSearch },
       { label: "身份解析", term: "Identity Resolution", to: "/unify/identity", icon: Fingerprint },
       { label: "计算特征", term: "Computed Traits", to: "/unify/traits", icon: Tag },
+      { label: "群组", term: "Groups", to: "/unify/groups", icon: Boxes },
       { label: "SQL 特征", term: "SQL Traits", to: "/unify/sql-traits", icon: FileCode2 },
       { label: "预测", term: "Predictions", to: "/unify/predictions", icon: Sparkles },
       { label: "档案同步", term: "Profiles Sync", to: "/unify/sync", icon: Cloud },
@@ -47,6 +50,7 @@ export const SECTIONS: NavSection[] = [
   {
     label: "对象", term: "Objects", to: "/objects", icon: Boxes,
     children: [
+      { label: "对象模型", term: "Data Model", to: "/objects/model", icon: GitBranch },
       { label: "门店", term: "Stores", to: "/objects/store", icon: Store },
       { label: "产品", term: "Products", to: "/objects/product", icon: Package },
       { label: "订单", term: "Orders", to: "/objects/order", icon: ShoppingCart },
@@ -54,6 +58,10 @@ export const SECTIONS: NavSection[] = [
   },
   {
     label: "客户", term: "Accounts", to: "/accounts", icon: Building2,
+    children: [
+      { label: "客户列表", term: "Accounts", to: "/accounts", icon: Building2 },
+      { label: "合并日志", term: "Merge Log", to: "/accounts/-/merge-log", icon: GitMerge },
+    ],
   },
   {
     label: "触达", term: "Engage", to: "/engage", icon: Megaphone,
@@ -97,6 +105,7 @@ export const FOOTER_SECTION: NavSection = {
     { label: "权限管理", term: "Access Management", to: "/settings/access", icon: Users },
     { label: "API 令牌", term: "API Tokens", to: "/settings/tokens", icon: KeyRound },
     { label: "审计日志", term: "Audit Trail", to: "/settings/audit", icon: History },
+    { label: "租户管理", term: "Tenant Management", to: "/settings/tenants", icon: Building2 },
   ],
 };
 

@@ -1,40 +1,134 @@
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Plus, Trash2, FileCheck2 } from "lucide-react";
 import Layout from "../../components/layout/Layout";
-import { Card, DataTable } from "../../components/ui";
-import { StatCards, MockTag } from "../../components/segment/kit";
-import { trackingPlans, trackingEvents } from "../../mock/data";
+import { Button, Card, Modal, Spinner, TextField } from "../../components/ui";
+import { StatCards, StatusPill, EmptyState } from "../../components/segment/kit";
+import { useTenant } from "../../context/TenantContext";
+import {
+  listTrackingPlans, createTrackingPlan, deleteTrackingPlan,
+  type TrackingPlan,
+} from "../../api/protocols";
 
 export default function TrackingPlansPage() {
-  const avg = Math.round(
-    trackingPlans.reduce((a, p) => a + parseInt(p.conformance), 0) / trackingPlans.length
-  );
+  const { tenant } = useTenant();
+  const navigate = useNavigate();
+  const [plans, setPlans] = useState<TrackingPlan[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [sources, setSources] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    setPlans(null); setErr(null);
+    listTrackingPlans(tenant).then(setPlans).catch((e) => setErr(String(e)));
+  }
+  useEffect(load, [tenant]);
+
+  async function create() {
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      await createTrackingPlan(tenant, {
+        name: name.trim(),
+        description: desc.trim() || null,
+        sources: sources.split(",").map((s) => s.trim()).filter(Boolean),
+      });
+      setOpen(false); setName(""); setDesc(""); setSources("");
+      load();
+    } catch (e) {
+      setErr(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(p: TrackingPlan) {
+    if (!confirm(`删除埋点计划「${p.name}」及其全部事件？`)) return;
+    try {
+      await deleteTrackingPlan(tenant, p.id);
+      load();
+    } catch (e) {
+      setErr(String(e));
+    }
+  }
+
+  const total = plans?.length ?? 0;
+  const enabled = plans?.filter((p) => Number(p.enabled) === 1).length ?? 0;
+
   return (
     <Layout
       title="埋点计划 Tracking Plans"
-      subtitle="校验事件 schema、治理数据质量，确保上报符合规范"
-      actions={<MockTag />}
+      subtitle="校验事件 schema、治理数据质量，确保上报符合规范（来自 /protocols/tracking-plans）"
+      actions={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> 新建计划</Button>}
     >
       <StatCards items={[
-        { label: "埋点计划数", value: trackingPlans.length },
-        { label: "事件总数", value: trackingPlans.reduce((a, p) => a + p.events, 0) },
-        { label: "平均合规率", value: `${avg}%` },
+        { label: "埋点计划数", value: total },
+        { label: "已启用", value: enabled },
+        { label: "已停用", value: total - enabled },
       ]} />
-      <Card className="mb-6 p-2">
-        <DataTable
-          columns={["计划", "事件数", "数据源", "合规率", "更新"]}
-          rows={trackingPlans.map((p) => ({
-            计划: p.name, 事件数: p.events, 数据源: p.sources, 合规率: p.conformance, 更新: p.updated,
-          }))}
+
+      {err && <Card className="mb-4 p-4 text-sm text-red-600">{err}</Card>}
+      {!plans && !err && <div className="flex items-center gap-2 text-gray-500"><Spinner /> 加载中…</div>}
+
+      {plans && plans.length === 0 && (
+        <EmptyState
+          icon={FileCheck2}
+          title="还没有埋点计划"
+          desc="创建埋点计划以定义事件 schema，校验上报数据质量。"
+          action={<Button onClick={() => setOpen(true)}><Plus className="h-4 w-4" /> 新建计划</Button>}
         />
-      </Card>
-      <h2 className="mb-3 text-sm font-semibold text-gray-900">事件 Schema（电商核心埋点）</h2>
-      <Card className="p-2">
-        <DataTable
-          columns={["事件", "类型", "属性数", "必填", "状态"]}
-          rows={trackingEvents.map((e) => ({
-            事件: e.event, 类型: e.type, 属性数: e.properties, 必填: e.required, 状态: e.status,
-          }))}
-        />
-      </Card>
+      )}
+
+      {plans && plans.length > 0 && (
+        <Card className="p-2">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-xs uppercase tracking-wider text-gray-400">
+                <th className="px-4 py-3 font-semibold">计划</th>
+                <th className="px-4 py-3 font-semibold">描述</th>
+                <th className="px-4 py-3 font-semibold">数据源</th>
+                <th className="px-4 py-3 font-semibold">状态</th>
+                <th className="px-4 py-3 font-semibold">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {plans.map((p) => (
+                <tr key={p.id} className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => navigate(`/protocols/tracking-plans/${p.id}`)}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
+                  <td className="px-4 py-3 text-gray-500">{p.description || "—"}</td>
+                  <td className="px-4 py-3 text-gray-700">{(p.sources || []).join(", ") || "—"}</td>
+                  <td className="px-4 py-3">
+                    {Number(p.enabled) === 1
+                      ? <StatusPill tone="green">启用</StatusPill>
+                      : <StatusPill tone="gray">停用</StatusPill>}
+                  </td>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <button className="text-gray-400 hover:text-red-600" onClick={() => remove(p)} title="删除">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      )}
+
+      <Modal open={open} title="新建埋点计划" onClose={() => setOpen(false)}>
+        <div className="space-y-4">
+          <TextField label="计划名" value={name} onChange={setName} placeholder="如：电商核心埋点" />
+          <TextField label="描述" value={desc} onChange={setDesc} placeholder="可选" />
+          <TextField label="数据源（逗号分隔）" value={sources} onChange={setSources} placeholder="app, web, 小程序" />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setOpen(false)}>取消</Button>
+            <Button onClick={create} disabled={busy || !name.trim()}>{busy ? "创建中…" : "创建"}</Button>
+          </div>
+        </div>
+      </Modal>
     </Layout>
   );
 }

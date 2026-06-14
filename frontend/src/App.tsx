@@ -13,6 +13,17 @@ import AccountsPage from "./pages/AccountsPage";
 import AccountDetailPage from "./pages/AccountDetailPage";
 import EngagePage from "./pages/EngagePage";
 import TagsPage from "./pages/TagsPage";
+// 功能模块新增页
+import TenantsPage from "./pages/platform/TenantsPage";
+import TenantDetailPage from "./pages/platform/TenantDetailPage";
+import PipelinesPage from "./pages/PipelinesPage";
+import GroupsPage from "./pages/GroupsPage";
+import ObjectModelPage from "./pages/ObjectModelPage";
+import ObjectRecordDetailPage from "./pages/ObjectRecordDetailPage";
+import AccountMergeLogPage from "./pages/AccountMergeLogPage";
+import JourneyDetailPage from "./pages/segment/JourneyDetailPage";
+import BroadcastDetailPage from "./pages/segment/BroadcastDetailPage";
+import TrackingPlanDetailPage from "./pages/segment/TrackingPlanDetailPage";
 
 // Connections
 import FunctionsPage from "./pages/segment/FunctionsPage";
@@ -33,14 +44,14 @@ import AudienceDetailPage from "./pages/segment/AudienceDetailPage";
 import TrackingPlansPage from "./pages/segment/TrackingPlansPage";
 import ViolationsPage from "./pages/segment/ViolationsPage";
 import TransformationsPage from "./pages/segment/TransformationsPage";
-// Privacy
-import DataControlsPage from "./pages/segment/DataControlsPage";
-import ConsentPage from "./pages/segment/ConsentPage";
-import DeletionPage from "./pages/segment/DeletionPage";
-// Monitor
-import DeliveryPage from "./pages/segment/DeliveryPage";
-import AlertsPage from "./pages/segment/AlertsPage";
-import EventLogsPage from "./pages/segment/EventLogsPage";
+// Privacy（真实页，接 /api/privacy/*）
+import PrivacyDataControlsPage from "./pages/PrivacyDataControlsPage";
+import PrivacyConsentPage from "./pages/PrivacyConsentPage";
+import PrivacyDeletionPage from "./pages/PrivacyDeletionPage";
+// Monitor（真实页，接 /api/monitor/*）
+import MonitorDeliveryPage from "./pages/MonitorDeliveryPage";
+import MonitorAlertsPage from "./pages/MonitorAlertsPage";
+import MonitorEventLogsPage from "./pages/MonitorEventLogsPage";
 // Settings
 import SettingsGeneralPage from "./pages/segment/SettingsGeneralPage";
 import AccessPage from "./pages/segment/AccessPage";
@@ -65,6 +76,7 @@ export default function App() {
           <Route path="/connections/warehouses" element={<WarehousesPage />} />
           <Route path="/connections/functions" element={<FunctionsPage />} />
           <Route path="/connections/flow" element={<EtlFlowPage />} />
+          <Route path="/connections/pipelines" element={<PipelinesPage />} />
           <Route path="/connections/sources/new" element={<EtlPage />} />
           <Route path="/connections/sources/:id" element={<SourceDetailPage />} />
 
@@ -75,12 +87,16 @@ export default function App() {
           <Route path="/unify/sql-traits" element={<SqlTraitsPage />} />
           <Route path="/unify/predictions" element={<PredictionsPage />} />
           <Route path="/unify/sync" element={<ProfilesSyncPage />} />
+          <Route path="/unify/groups" element={<GroupsPage />} />
           <Route path="/unify/profiles/:id" element={<ProfileDetailPage />} />
 
           {/* 对象管理 / 客户管理（一级菜单） */}
           <Route path="/objects" element={<ObjectsHubPage />} />
+          <Route path="/objects/model" element={<ObjectModelPage />} />
           <Route path="/objects/:key" element={<ObjectListPage />} />
+          <Route path="/objects/:key/:pk" element={<ObjectRecordDetailPage />} />
           <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/accounts/-/merge-log" element={<AccountMergeLogPage />} />
           <Route path="/accounts/:id" element={<AccountDetailPage />} />
 
           {/* Engage */}
@@ -88,28 +104,33 @@ export default function App() {
           <Route path="/engage/audiences/new" element={<FilterPage />} />
           <Route path="/engage/audiences/:id" element={<AudienceDetailPage />} />
           <Route path="/engage/journeys" element={<JourneysPage />} />
+          <Route path="/engage/journeys/:id" element={<JourneyDetailPage />} />
           <Route path="/engage/broadcasts" element={<BroadcastsPage />} />
+          <Route path="/engage/broadcasts/:id" element={<BroadcastDetailPage />} />
 
           {/* Protocols */}
           <Route path="/protocols" element={<TrackingPlansPage />} />
+          <Route path="/protocols/tracking-plans/:id" element={<TrackingPlanDetailPage />} />
           <Route path="/protocols/violations" element={<ViolationsPage />} />
           <Route path="/protocols/transformations" element={<TransformationsPage />} />
 
           {/* Privacy */}
-          <Route path="/privacy" element={<DataControlsPage />} />
-          <Route path="/privacy/consent" element={<ConsentPage />} />
-          <Route path="/privacy/deletion" element={<DeletionPage />} />
+          <Route path="/privacy" element={<PrivacyDataControlsPage />} />
+          <Route path="/privacy/consent" element={<PrivacyConsentPage />} />
+          <Route path="/privacy/deletion" element={<PrivacyDeletionPage />} />
 
           {/* Monitor */}
-          <Route path="/monitor" element={<DeliveryPage />} />
-          <Route path="/monitor/alerts" element={<AlertsPage />} />
-          <Route path="/monitor/logs" element={<EventLogsPage />} />
+          <Route path="/monitor" element={<MonitorDeliveryPage />} />
+          <Route path="/monitor/alerts" element={<MonitorAlertsPage />} />
+          <Route path="/monitor/logs" element={<MonitorEventLogsPage />} />
 
           {/* Settings */}
           <Route path="/settings" element={<SettingsGeneralPage />} />
           <Route path="/settings/access" element={<AccessPage />} />
           <Route path="/settings/tokens" element={<TokensPage />} />
           <Route path="/settings/audit" element={<AuditPage />} />
+          <Route path="/settings/tenants" element={<TenantsPage />} />
+          <Route path="/settings/tenants/:id" element={<TenantDetailPage />} />
 
           {/* 旧路由别名（外链兼容） */}
           <Route path="/filter" element={<Navigate to="/engage/audiences/new" replace />} />

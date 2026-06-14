@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { GitMerge } from "lucide-react";
 import Layout from "../components/layout/Layout";
 import { Card, DataTable, Spinner, Badge } from "../components/ui";
-import { searchObjects } from "../api/client";
+import { listAccounts } from "../api/accounts";
 import { useTenant } from "../context/TenantContext";
 
 // 客户管理 —— 客户(account)列表，一个客户可含多个用户。点击行进入客户详情。
@@ -14,7 +16,7 @@ export default function AccountsPage() {
 
   useEffect(() => {
     setRows(null); setErr(null);
-    searchObjects({ tenant_id: tenant, object: "account", limit: 200 })
+    listAccounts(tenant, 200)
       .then((r) => setRows(r.data || []))
       .catch((e) => setErr(String(e)));
   }, [tenant]);
@@ -31,7 +33,14 @@ export default function AccountsPage() {
     <Layout
       title="客户 Accounts"
       subtitle="客户（账户）主数据 —— 一个客户可关联多个用户；点击客户查看其用户"
-      actions={rows ? <Badge color="brand">{rows.length} 个客户</Badge> : undefined}
+      actions={
+        <div className="flex items-center gap-3">
+          {rows && <Badge color="brand">{rows.length} 个客户</Badge>}
+          <Link to="/accounts/-/merge-log" className="inline-flex items-center gap-1 text-sm font-medium text-brand-600">
+            <GitMerge className="h-4 w-4" /> 合并日志
+          </Link>
+        </div>
+      }
     >
       {err && <Card className="p-5 text-sm text-red-600">{err}</Card>}
       {!rows && !err && <div className="flex items-center gap-2 text-gray-500"><Spinner /> 加载中…</div>}
