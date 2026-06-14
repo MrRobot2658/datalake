@@ -1,6 +1,8 @@
 # 模块 00 · 平台底座 Platform
 
-> 状态：**外壳真实、鉴权 Mock** · 对标 Segment 的 App Shell + 工作区 + IAM 壳
+> 状态：**外壳真实、租户管理后端已落地、鉴权 Mock** · 对标 Segment 的 App Shell + 工作区 + IAM 壳
+>
+> 本轮落地：`tenant_config` / `tenant_audit` 表 + `tenants` 表生命周期扩展（均「已建」）；sql-engine 新增 `platform_api.py`（`/platform/*` 路由，已挂载于 `main.py`），实现租户 CRUD + 启停 + 每租户配置读写（dry-run 校验）+ 配置变更审计。全局验收 pytest 411P / 0F / 2S。前端管理 UI 仍待接（见 §4）。
 
 ## 1. 概述
 
@@ -36,8 +38,59 @@
 
 ### 2.4 数据模型
 
-- 平台底座不直接拥有业务表；依赖 `tenants` 表（租户基础信息）与新增的 `tenant_config` 表（每租户配置，见 §2.5）。
-- 前端无持久化；`TenantContext` 仅内存态（当前 `tenants` 写死 `[1001,1002]`，落地后改为从 `GET /tenants` 拉取）。
+本模块已落地三处 schema 变更（`sql/migrate_modules.sql`，经 `scripts/apply_migrations.sh` 应用，全部幂等）。
+
+#### 2.4.1 `tenants` 表生命周期扩展【已建】
+
+通过幂等存储过程 `_add_col` / `_add_idx` 为既有 `tenants` 表新增列（重复执行安全，不改 PK）：
+
+| 列 | 类型 | 默认 | 说明 |
+|----|------|------|------|
+| `status` | `ENUM('active','suspended')` | `active` | 租户状态，停用后网关可拦截 |
+| `scale_tier` | `VARCHAR(32)` | `dev` | dev/medium/large/xlarge，驱动容量配置 |
+| `contact_email` | `VARCHAR(128)` | | 租户联系人 |
+| `description` | `VARCHAR(512)` | | 租户描述 |
+| `max_events_qps` | `INT` | `10000` | QPS 上限（软限） |
+| `region` | `VARCHAR(64)` | | 区域 |
+| `plan` | `ENUM('starter','business','enterprise')` | `business` | 套餐 |
+| `slug` | `VARCHAR(128)` | | 工作区 URL 标识符 |
+| `updated_at` | `DATETIME` | `CURRENT_TIMESTAMP ON UPDATE` | 更新时间 |
+
+索引：`idx_status(status)`、`idx_slug(slug)`。基础 4 字段（`tenant_id` / `tenant_name` / `tier` / `kafka_topic`）沿用既有定义。
+
+#### 2.4.2 `tenant_config`——每租户独立配置存储【已建】
+
+运行时热加载，避免全局 env 污染。一行存一个 `(域, 键)` 的配置值。
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `tenant_id` | `BIGINT NOT NULL` | 租户 |
+| `config_domain` | `VARCHAR(32) NOT NULL` | 配置域：基础/数据通道/容量/ID-Mapping/存储/隐私/集成/配额 |
+| `config_key` | `VARCHAR(64) NOT NULL` | 如 kafka_topic / scale_tier / confidence_threshold / olap_backend |
+| `config_value` | `JSON` | 字段值或嵌套配置对象 |
+| `created_at` / `updated_at` | `DATETIME` | `updated_at` 带 `ON UPDATE CURRENT_TIMESTAMP` |
+| `updated_by` | `VARCHAR(128)` | 更新者标识（预留鉴权） |
+
+主键 `(tenant_id, config_domain, config_key)`；索引 `idx_domain(tenant_id, config_domain)`。`ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`。
+
+#### 2.4.3 `tenant_audit`——配置变更审计日志【已建】
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `audit_id` | `BIGINT AUTO_INCREMENT PK` | 审计主键 |
+| `tenant_id` | `BIGINT NOT NULL` | 租户 |
+| `actor` | `VARCHAR(128) NOT NULL` | 操作者邮箱或 user_id（默认 `system`）|
+| `action` | `VARCHAR(32) NOT NULL` | create / update / suspend / resume |
+| `target` | `VARCHAR(64) NOT NULL` | 变更目标：`tenant` / `status` / 某 `config_domain` |
+| `old_value` / `new_value` | `JSON` | 变更前后值（`ensure_ascii=false` 存中文） |
+| `reason` | `VARCHAR(256)` | 变更原因/备注 |
+| `created_at` | `DATETIME` | 默认 `CURRENT_TIMESTAMP` |
+
+索引 `idx_tenant_time(tenant_id, created_at)`。`ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`。
+
+> 说明：「近 24h 事件量」非新建表，由 `merge_log`（ID 合并操作）按 `tenant_id` + 时间窗实时聚合作真实代理。
+
+- 前端无持久化；`TenantContext` 仅内存态（当前 `tenants` 写死 `[1001,1002]`，待改为从 `GET /platform/tenants` 拉取，见 §4）。
 
 ### 2.5 租户管理与每租户配置
 
@@ -79,8 +132,40 @@
 
 #### 2.5.4 真实 vs Mock 边界
 
-- 现状：`tenants` 表已存在（基础 4 字段 + 1003 共享 topic 示例），但**无管理 UI**、**无 `tenant_config`**、配置散落在全局 env（`OLAP_*`/`AGENT_LLM_ENABLED`/scale 脚本）。
-- 落地目标：把全局 env 配置「下沉」为每租户配置，并提供管理 UI + 后端 CRUD + 审计。
+- 现状（本轮后）：`tenant_config` / `tenant_audit` 表【已建】，后端 `/platform/*` CRUD + 配置读写 + 审计【已落地】；**前端管理 UI 仍未接**，全局 env（`OLAP_*`/`AGENT_LLM_ENABLED`/scale 脚本）尚未真正「下沉」消费配置表。
+- 落地目标（剩余）：前端管理 UI；让 id-mapping / executor / scale 脚本按 `tenant_id` 读取有效配置，取代全局 env。
+
+## 2.6 逻辑设计（后端，本轮落地）
+
+实现位于 `services/sql-engine/platform_api.py`：自带 `APIRouter(prefix="/platform")`（变量 `router`）+ 本模块私有 Pydantic 模型（刻意不写进 `schemas.py`），`main.py` 第 49/498 行 `import` 并 `include_router`。`PlatformService` 复用 `MysqlOlapExecutor().config` 取连接，全部参数化 SQL，读写按 `tenant_id` 隔离——不手拼 SQL、不改既有 service。经网关访问前缀为 `/api/platform/*`（nginx 剥 `/api`）。
+
+### 2.6.1 端点列表
+
+| Method | Path | 请求 | 响应 |
+|--------|------|------|------|
+| GET | `/platform/tenants` | query: `search` / `tier` / `status` / `limit`(1–200,默认50) / `offset` | `{tenants:[{tenant_id,tenant_name,tier,status,scale_tier,contact_email,created_at,updated_at,events_count_24h}], total}` |
+| POST | `/platform/tenants` | `TenantCreate{tenant_name, tier="standard", scale_tier="dev", contact_email?, description?, actor?}` | `{tenant_id, tenant_name, status, created_at}` |
+| GET | `/platform/tenants/{tenant_id}` | path | 租户详情 + `config_summary{域:键数}`；404 不存在 |
+| PUT | `/platform/tenants/{tenant_id}` | `TenantUpdate{tenant_name?, tier?, scale_tier?, contact_email?, description?, actor?}`（部分更新）| `{tenant_id, updated_at}`；404 |
+| PATCH | `/platform/tenants/{tenant_id}` | `TenantStatusPatch{status: active\|suspended, reason?, actor?}` | `{tenant_id, status, updated_at}`；400 非法 status / 404 |
+| GET | `/platform/tenants/{tenant_id}/config` | query: `domain?` | `{tenant_id, 基础{...}, 数据通道{...}, ...}`（按域合并）；404 |
+| PUT | `/platform/tenants/{tenant_id}/config` | `TenantConfigUpdate{domain, updates:{key:value}, reason?, actor?}` | `{tenant_id, domain, updated_keys, updated_at}`；400 非法域/冲突 / 404 |
+| GET | `/platform/audit/tenant-config` | query: `tenant_id?` / `actor?` / `action?` / `limit` / `offset` | `{audits:[{audit_id,tenant_id,actor,action,target,old_value,new_value,reason,created_at}], total}` |
+
+配置域常量 `CONFIG_DOMAINS = [基础, 数据通道, 容量, ID-Mapping, 存储, 隐私, 集成, 配额]`。
+
+### 2.6.2 核心算法 / 流程
+
+- **创建租户**：`tenant_id` 非自增，取 `MAX(tenant_id)+1`（≥1001）；自动建 `kafka_topic = tenant-{id}-events`；`INSERT IGNORE` 初始化 `one_id_sequence`(next_id=100000)；写入「数据通道.kafka_topic」「容量.scale_tier」两条初始配置；落 `create` 审计。
+- **有效配置合并**（`get_config`）：「基础」域恒从 `tenants` 主表派生（tenant_name/tier/status/scale_tier/contact_email/kafka_topic/description），其余 7 域从 `tenant_config` 按行装配，`config_value` 做 JSON 反序列化；未配置的域返回空对象占位。
+- **配置 dry-run 校验**（`update_config`）：写前校验 `domain ∈ CONFIG_DOMAINS`、`updates` 非空；「数据通道.kafka_topic」校验全局唯一（与其它租户冲突则 400）。写用 `INSERT ... ON DUPLICATE KEY UPDATE`（幂等 upsert），并把「容量.scale_tier」「数据通道.kafka_topic」回写同步到 `tenants` 主表，保证两处一致。
+- **生命周期**（`set_status`）：status 仅允许 active/suspended，映射为 `resume`/`suspend` 审计动作。
+- **审计**：所有写操作（create/update/suspend/resume）统一经 `_audit()` 落 `tenant_audit`，记录 old/new JSON（`ensure_ascii=false` 存中文）。
+
+### 2.6.3 与其他模块依赖
+
+- **依赖**：`executor.MysqlOlapExecutor`（取连接/配置）、既有 `tenants` / `one_id_sequence` / `merge_log` 表。
+- **被依赖 / 关联**：[09-settings](./09-settings.md) 的 `settings_api.py` 复用 `tenant_config`（基础域读写共用同一存储）；停用态供网关拦截使用（规划）；配置「下沉」后供 id-mapping / executor / scale 脚本按租户消费（规划）。
 
 ## 3. 技术设计
 
@@ -101,12 +186,12 @@
 
 - 网关 **Nginx :8080**：`/console/` 托管前端，`/api/*` 反代到 SQL Engine `:8002`。
 - 鉴权：**当前无**。Workspace 切换只是前端切 `tenant_id`，无登录、无权限校验。
-- 租户管理（规划）：sql-engine 暴露 `GET/POST/PUT /tenants` 与 `GET/PUT /tenants/{id}/config`；写操作需超级管理员权限（落地于 [09-settings](./09-settings.md) IAM）。`tenants` + 新增 `tenant_config` 表经 `scripts/apply_migrations.sh` 迁移（强制 `utf8mb4`）。
+- 租户管理（**后端已落地**）：sql-engine `platform_api.py` 暴露 `/platform/tenants` CRUD + `PATCH` 启停 + `/platform/tenants/{id}/config` 读写 + `/platform/audit/tenant-config`（详见 §2.6）。`tenants` 扩展列 + `tenant_config` / `tenant_audit` 表经 `scripts/apply_migrations.sh` 迁移（强制 `utf8mb4`）。写操作的超级管理员鉴权仍待 [09-settings](./09-settings.md) IAM（当前 `actor` 由请求体传入，预留）。
 
 ### 3.3 真实 vs Mock 边界
 
-- 真实：导航、租户切换、页面骨架、主题、概览计数。
-- Mock / 规划：顶栏搜索、头像/登录态、组织级 Workspace（多租户已有，但无「组织/成员」概念）、**租户管理与每租户配置**（§2.5，`tenants` 表已在但无 UI/配置下沉）。
+- 真实：导航、租户切换、页面骨架、主题、概览计数；**租户管理后端**（CRUD/启停/每租户配置/审计，§2.6）+ `tenant_config` / `tenant_audit` 表。
+- Mock / 规划：顶栏搜索、头像/登录态、组织级 Workspace（多租户已有，但无「组织/成员」概念）、**租户管理前端 UI**（后端已就绪，UI 未接）、**配置「下沉」消费**（配置已可存取，但 id-mapping/executor/scale 尚未按租户读取，仍用全局 env）。
 
 ### 3.4 依赖与集成
 
@@ -119,9 +204,10 @@
 - [ ] [后端] 引入鉴权服务：登录、会话/JWT、`tenant_id` 从令牌解析（取代前端硬切）。
 - [ ] [前端] 登录页 + 路由守卫 + 401 拦截（axios 拦截器）。
 - [ ] [前端] 顶栏头像接真实用户；Workspace 列表来自后端 `GET /tenants` 而非写死 `[1001,1002]`。
-- [ ] [后端] 新增 `tenant_config` 表 + 迁移（§2.5）；`/tenants` CRUD 与 `/tenants/{id}/config` 读写接口。
-- [ ] [后端] 配置「下沉」：`OLAP_*` / `AGENT_LLM_ENABLED` / scale 档位等全局 env 改为按 `tenant_id` 读取有效配置。
-- [ ] [前端] 设置 → 租户管理页：租户列表 + 新建/编辑 + 各配置域 Tab + 启停 + 变更审计。
+- [x] [后端] 新增 `tenant_config` / `tenant_audit` 表 + `tenants` 扩展列 + 迁移（§2.4）；`/platform/tenants` CRUD 与 `/platform/tenants/{id}/config` 读写 + 审计接口（§2.6）。
+- [ ] [后端] 配置「下沉」：`OLAP_*` / `AGENT_LLM_ENABLED` / scale 档位等全局 env 改为按 `tenant_id` 读取 `tenant_config` 有效配置（存储已就绪，消费侧未接）。
+- [ ] [前端] 设置 → 租户管理页：租户列表 + 新建/编辑 + 各配置域 Tab + 启停 + 变更审计（接 `/platform/*` 端点）。
+- [ ] [后端] 停用态拦截：网关/中间件对 `status=suspended` 租户的请求返回 403。
 
 **P1（体验与健壮性）**
 - [ ] [前端] 全局搜索接 `objects/search` 跨对象（Sources/Audiences/Profiles）。

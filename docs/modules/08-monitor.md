@@ -1,6 +1,6 @@
 # 模块 08 · 监控 Monitor
 
-> 状态：全 Mock（可观测蓝图） · 对标 Segment Monitor
+> 状态：后端已落地（4 张表 + 19 个端点，pytest 全局 411P/0F/2S 通过） · 前端仍 Mock 待接 · 对标 Segment Monitor
 
 ## 1. 概述
 
@@ -48,27 +48,129 @@
 
 ### 2.4 数据模型
 
-> 标 `待建` 为需要新增的指标/表；同时指出**已有可用信号**作为接真起点。
+> 本模块 4 张表均**已建**（`sql/migrate_modules.sql`，`CREATE TABLE IF NOT EXISTS` + `utf8mb4_unicode_ci`，经 `scripts/apply_migrations.sh` 应用）。全表含 `tenant_id`，所有查询按租户隔离。下列 DDL 要点取自迁移文件真实定义。
 
-**建议指标（时序，按 tenant + source + 时间桶聚合）**
+#### `monitor_metrics` —— 监控指标聚合（已建）
 
-| 指标 | 字段 | 说明 | 状态 | 已有信号 |
-|------|------|------|------|----------|
-| 事件吞吐 | `events_total` | 单位时间事件计数 | 待建 | `POST /events/process`、`POST /etl/import` 调用计数；`merge-log` 行数 |
-| 成功/失败 | `success_total` / `failed_total` | 成功率 = success/total | 待建 | 入库路径返回码打点 |
-| 处理时延 | `latency_ms_p50/p95/p99` | 入库/投递耗时分布 | 待建 | 入库路径耗时打点 |
-| 数据源错误率 | `error_rate` | 按 source 维度 | 待建 | 同上，按 source 分组 |
+分钟/小时桶聚合表，替代真时序库的轻量方案。写入用 `ON DUPLICATE KEY UPDATE` 按主键累加计数、分位取最新值。
 
-**建议表（聚合存储）**
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `tenant_id` | BIGINT NOT NULL | 租户（联合主键） |
+| `bucket_ts` | DATETIME NOT NULL | 分钟/小时桶时间戳（联合主键） |
+| `source` | VARCHAR(128) NOT NULL DEFAULT '' | 数据源名称（联合主键） |
+| `events_total` | INT DEFAULT 0 | 桶内事件总数 |
+| `success_count` / `failed_count` | INT DEFAULT 0 | 成功 / 失败计数 |
+| `latency_ms_p50` / `latency_ms_p95` / `latency_ms_p99` | INT | 时延分位 |
+| `created_at` / `updated_at` | DATETIME | 创建 / 更新（ON UPDATE CURRENT_TIMESTAMP） |
 
-| 表 | 关键列 | 说明 | 状态 |
-|----|--------|------|------|
-| `monitor_metrics` | `tenant_id, source, bucket_ts, events, success, failed, p95_ms` | 分钟/小时桶聚合表（替代真时序库的轻量方案） | 待建 |
-| `monitor_alert_rule` | `id, tenant_id, name, metric, op, threshold, window, scope, channel, severity, enabled` | 告警规则 | 待建 |
-| `monitor_alert_event` | `id, rule_id, fired_at, value, status` | 告警触发记录（驱动「最近触发」） | 待建 |
-| `event_delivery_log` | `ts, tenant_id, source, event, dest, status, http_code` | 逐事件投递日志 | 待建（雏形：`merge_log`） |
+- 主键：`(tenant_id, bucket_ts, source)`
+- 索引：`idx_tenant_time(tenant_id, bucket_ts)`、`idx_tenant_source(tenant_id, source, bucket_ts)`
 
-**Mock 字段对照（`frontend/src/mock/data.ts`）**：`deliveryMetrics`(events24h/successRate/failed24h/p95LatencyMs/series[])、`sourcesHealth`(source/events24h/errorRate/status)、`alerts`(name/channel/scope/status/severity/last)、`eventLogs`(time/source/event/dest/status/code) —— 每个字段对应上表一列，接真时一一替换。
+#### `monitor_alert_rule` —— 告警规则（已建）
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | BIGINT AUTO_INCREMENT PK | 主键 |
+| `tenant_id` | BIGINT NOT NULL | 租户 |
+| `name` | VARCHAR(256) NOT NULL | 规则名称 |
+| `metric` | VARCHAR(64) NOT NULL | success_rate/event_count/error_rate/latency_p95 |
+| `operator` | VARCHAR(32) NOT NULL | lt/gt/eq/gte/lte |
+| `threshold` | DECIMAL(10,2) NOT NULL | 阈值 |
+| `window_minutes` | INT DEFAULT 5 | 评估窗口（分钟） |
+| `scope` / `scope_value` | VARCHAR(64) / VARCHAR(256) | all_sources/specific_source/specific_destination 及其取值 |
+| `channel` | VARCHAR(128) NOT NULL | email/feishu/webhook |
+| `channel_config` | JSON | 渠道配置 |
+| `severity` | VARCHAR(32) DEFAULT 'medium' | high/medium/low |
+| `enabled` | TINYINT DEFAULT 1 | 是否启用 |
+| `created_at` / `updated_at` | DATETIME | 时间戳 |
+
+- 索引：`idx_tenant(tenant_id)`、`idx_tenant_enabled(tenant_id, enabled)`
+
+#### `monitor_alert_event` —— 告警触发记录（已建）
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | BIGINT AUTO_INCREMENT PK | 主键 |
+| `tenant_id` | BIGINT NOT NULL | 租户 |
+| `rule_id` | BIGINT NOT NULL | 关联 `monitor_alert_rule.id` |
+| `fired_at` | DATETIME NOT NULL | 触发时刻 |
+| `metric_value` | DECIMAL(10,2) | 触发时指标值 |
+| `status` | VARCHAR(32) DEFAULT 'triggered' | triggered/acknowledged/resolved |
+| `acknowledged_at` / `acknowledged_by` | DATETIME / VARCHAR(128) | 确认时刻 / 确认人 |
+| `resolved_at` | DATETIME | 解决时刻 |
+| `detail` | JSON | 触发明细（含 overview 快照） |
+| `created_at` | DATETIME | 创建时间 |
+
+- 索引：`idx_rule_fired(rule_id, fired_at)`、`idx_tenant_fired(tenant_id, fired_at)`
+- 外键：`fk_alert_rule (rule_id) REFERENCES monitor_alert_rule(id) ON DELETE CASCADE`（删规则级联清触发记录）
+
+#### `event_delivery_log` —— 逐事件投递日志（已建）
+
+| 列 | 类型 | 说明 |
+|----|------|------|
+| `id` | BIGINT AUTO_INCREMENT PK | 主键 |
+| `tenant_id` | BIGINT NOT NULL | 租户 |
+| `ts` | DATETIME NOT NULL | 事件处理时刻 |
+| `source` | VARCHAR(128) NOT NULL | 数据源名称 |
+| `event_name` | VARCHAR(256) | 事件类型名 |
+| `destination` | VARCHAR(256) | 目的地名称 |
+| `status` | VARCHAR(32) DEFAULT 'success' | success/failed/retry/skipped |
+| `http_code` | INT | 投递返回码 |
+| `latency_ms` | INT | 投递耗时 |
+| `error_message` | VARCHAR(512) | 失败原因 |
+| `event_id` | VARCHAR(256) | 原始事件 ID |
+| `detail` | JSON | 明细 |
+| `created_at` | DATETIME | 创建时间 |
+
+- 索引：`idx_tenant_ts(tenant_id, ts)`、`idx_source_dest(tenant_id, source, destination, ts)`、`idx_status(tenant_id, status, ts)`
+
+**Mock 字段对照（`frontend/src/mock/data.ts`）**：`deliveryMetrics`(events24h/successRate/failed24h/p95LatencyMs/series[]) ↔ `GET /monitor/overview` + `GET /monitor/metrics`；`sourcesHealth`(source/events24h/errorRate/status) ↔ `GET /monitor/sources`；`alerts`(name/channel/scope/status/severity/last) ↔ `GET /monitor/alert-rules` + `/alert-events`；`eventLogs`(time/source/event/dest/status/code) ↔ `GET /monitor/delivery-logs` —— 前端接真时按此映射逐字段替换。
+
+## 2.5 逻辑设计（本轮落地）
+
+后端落在 `services/sql-engine/monitor_api.py`：自包含一个 `MonitorService`（直连 MySQL，复用 `executor.MysqlOlapExecutor().config`）+ `APIRouter(prefix="/monitor")`，由 `main.py` 以 `include_router` 挂载。**只做加法**：不改 `main.py` 既有内联端点、不动 `schemas.py`/既有 service。所有 SQL 参数化、按 `tenant_id` 隔离；monitor 为可观测指标、不涉及圈人，故不走 `objects.build_sql`/`dsl` 路径（无安全圈人语义）。
+
+### 2.5.1 端点列表
+
+`tenant_id` 均为必填 query 参数；网关 `/api/*` 经 nginx 剥前缀转 sql-engine。
+
+| 方法 | 路径 | 请求（body / 关键 query） | 响应 |
+|------|------|---------------------------|------|
+| GET | `/monitor/overview` | `source?`, `window_minutes=60` | KPI：events_total/success_count/failed_count/success_rate/error_rate/avg_latency_p50/p95/p99/bucket_count |
+| GET | `/monitor/metrics` | `source?`, `start?`, `end?`, `limit=500` | 指标桶时间序列（按 `bucket_ts` 升序，供折线图） |
+| POST | `/monitor/metrics` | `MetricUpsert`(bucket_ts, source, events_total, success_count, failed_count, latency_p50/p95/p99) | upsert 后的桶行（累加） |
+| GET | `/monitor/sources` | — | 各 source 汇总：events_total/success_count/failed_count/last_bucket_ts/success_rate |
+| GET | `/monitor/delivery-logs` | `source?/destination?/status?/event_name?/start?/end?`, `limit=100` | 逐事件投递日志（按 `ts` 降序） |
+| POST | `/monitor/delivery-logs` | `DeliveryLogCreate`(source 必填, event_name/destination/status/http_code/latency_ms/error_message/event_id/detail) | 写入的日志行 |
+| GET | `/monitor/delivery-stats` | `group_by=status`, `window_minutes=60` | 按 status/source/destination/event_name 分组的 cnt/success/failed/avg_latency |
+| GET | `/monitor/alert-rules` | `enabled?` | 规则列表（id 降序） |
+| POST | `/monitor/alert-rules` | `AlertRuleCreate` | 新建规则 |
+| GET | `/monitor/alert-rules/{rule_id}` | — | 单条规则（404 不存在） |
+| PUT | `/monitor/alert-rules/{rule_id}` | `AlertRuleUpdate`（部分字段） | 更新后规则（404 不存在） |
+| DELETE | `/monitor/alert-rules/{rule_id}` | — | `{deleted:true,id}`（级联删触发记录） |
+| POST | `/monitor/alert-rules/{rule_id}/evaluate` | `fire=true` | 评估结果：metric_value/breached/fired_event |
+| GET | `/monitor/alert-events` | `rule_id?/status?`, `limit=100` | 触发记录（JOIN 规则名/metric/severity，fired_at 降序） |
+| POST | `/monitor/alert-events` | `AlertEventCreate`(rule_id, fired_at?, metric_value?, detail?) | 新建触发记录（规则不存在 404） |
+| GET | `/monitor/alert-events/{event_id}` | — | 单条触发记录（404） |
+| POST | `/monitor/alert-events/{event_id}/acknowledge` | `AlertAck`(acknowledged_by?) | 置 acknowledged（仅对 triggered 生效） |
+| POST | `/monitor/alert-events/{event_id}/resolve` | — | 置 resolved（非 resolved 才更新） |
+
+### 2.5.2 核心算法 / 流程
+
+- **指标聚合（upsert_metric）**：`INSERT ... ON DUPLICATE KEY UPDATE`，按主键 `(tenant_id, bucket_ts, source)` 累加 events/success/failed，分位 `COALESCE(VALUES(...), 旧值)` 取最新非空——同一桶可被采集端多次增量写入。
+- **总览（overview）**：对近 `window_minutes` 的桶 `SUM` 计数、`AVG` 分位；`success_rate = success/total*100`、`error_rate = failed/total*100`（total=0 时返回 null 避免除零）。`window_minutes` 钳制在 `[1, 43200]`。
+- **投递分组统计（delivery_stats）**：`group_by` 经白名单常量映射（status/source/destination/event_name），非法值抛 400；列名来自常量而非用户串拼接，规避注入。
+- **规则评估（evaluate_rule）**：取规则窗口 → 调 `overview`（scope=specific_source 时按 source 过滤）→ 从 `{success_rate, error_rate, event_count, latency_p95}` 取指标值 → `_compare(value, operator, threshold)`（lt/lte/gt/gte/eq）判越界 → `breached && fire` 时落 `monitor_alert_event`，`detail` 内嵌 overview 快照。
+- **告警生命周期**：triggered → acknowledge（记 acknowledged_at/by，仅 triggered 可确认）→ resolve（记 resolved_at，非 resolved 即可）。
+- **JSON 字段**：`channel_config`/`detail` 写入 `json.dumps(..., ensure_ascii=False)` 保中文，读出经 `_loads` 反序列化。
+
+### 2.5.3 与其他模块依赖
+
+- **执行器**：复用 `executor.MysqlOlapExecutor` 的连接配置，与全局存储解耦约定一致（不自建连接串）。
+- **采集上游（接真起点）**：`POST /monitor/metrics`、`POST /monitor/delivery-logs` 供入库路径 `POST /events/process`、`POST /etl/import` 及 id-mapping `merge_log` 打点写入；当前由模拟/采集端调用，尚无自动埋点中间件。
+- **01-Connections Destinations**：`event_delivery_log.destination/status/http_code` 语义对应 Destinations 投递结果，需投递侧回写；Monitor 仅做读侧聚合展示。
+- **前端**：`pages/segment/` 的 DeliveryPage/AlertsPage/EventLogsPage 仍读 `mock/data.ts`，待按 2.4 字段映射切到上列端点。
 
 ## 3. 技术设计
 
@@ -80,31 +182,25 @@
 
 ### 3.2 后端
 
-> 当前无 Monitor 后端服务；以下均 `待建`，可在现有 `services/` 内扩展。
+> 已落地：`services/sql-engine/monitor_api.py`（`MonitorService` + `APIRouter`），19 个端点见 2.5.1。以下为现状与剩余待建项。
 
-- **指标采集中间件（待建）**：在入库路径 `POST /events/process`、`POST /etl/import`（及 id-mapping 合并）包一层埋点，记录 `tenant/source/成功失败/耗时`，写入聚合缓冲。**可复用 `merge_log`** 作为现成事件流先把日志/吞吐跑通。
-- **聚合存储（待建）**：定时（分钟桶）把缓冲落到 `monitor_metrics`；不引入独立时序库，用 MySQL 聚合表 + 索引即可满足近24h/趋势查询。
-- **告警引擎（待建）**：周期评估 `monitor_alert_rule`，命中写 `monitor_alert_event` 并经**通知渠道（邮件/飞书 webhook）**下发。
-- **建议端点（待建）**：
-
-| 方法 | 路径 | 用途 |
-|------|------|------|
-| GET | `/monitor/metrics` | 投递概览：吞吐/成功率/P95/`series[]` |
-| GET | `/monitor/sources` | 数据源健康列表 |
-| GET/POST/PUT/DELETE | `/monitor/alerts` | 告警规则 CRUD |
-| GET | `/monitor/logs` | 事件投递日志（分页 + 按 source/dest/status 过滤） |
-
-均按 `tenant_id` 隔离，与全局约定一致。
+- **聚合存储（已建）**：4 张表落库（2.4），`monitor_metrics` 用 MySQL 聚合表 + 索引满足近24h/趋势查询，未引入独立时序库。
+- **指标/日志/告警端点（已建）**：总览、时序、upsert、数据源汇总、投递日志读写、分组统计、规则 CRUD、规则评估、触发记录确认/解决全部就绪并通过 pytest。
+- **规则评估引擎（已建，半自动）**：`POST /monitor/alert-rules/{id}/evaluate` 按窗口聚合判越界并落触发记录；**周期调度 + 通知下发（邮件/飞书 webhook）仍待建**——当前需外部定时调用 evaluate，命中后不自动发通知。
+- **指标采集中间件（待建）**：尚无自动埋点；需在入库路径 `POST /events/process`、`POST /etl/import`（及 id-mapping `merge_log`）包一层打点，调用 `POST /monitor/metrics`、`POST /monitor/delivery-logs` 写入。
 
 ### 3.3 真实 vs Mock 边界
 
-| 区块 | 现状 | 已有真实信号 | 接真路径 |
-|------|------|--------------|----------|
-| 投递概览指标 | Mock | 入库路径调用可统计 | 采集中间件 → `monitor_metrics` → `GET /monitor/metrics` |
-| 趋势图 series | Mock | 同上（按桶） | 聚合表按时间桶查询 |
-| 数据源健康 | Mock | 按 source 分组打点 | `GET /monitor/sources` |
-| 告警 | Mock（含按钮无表单） | 无 | 规则表 + 引擎 + 通知渠道 |
-| 事件日志 | Mock | **`GET /merge-log/{tenant}` 真实** | 先映射 merge_log，再扩展 `event_delivery_log` |
+| 区块 | 后端 | 前端 | 说明 |
+|------|------|------|------|
+| 投递概览 KPI | ✅ 真实 `GET /monitor/overview` | Mock | 表/端点就绪，前端待切 |
+| 趋势图 series | ✅ 真实 `GET /monitor/metrics`（按桶升序） | Mock | 直接喂 `Sparkline` |
+| 数据源健康 | ✅ 真实 `GET /monitor/sources` | Mock | 按 source 汇总 + 成功率 |
+| 告警规则 | ✅ 真实 CRUD `/monitor/alert-rules` | Mock（含按钮无表单） | 前端待补新建/编辑表单 |
+| 告警触发与生命周期 | ✅ 真实 `/monitor/alert-events` + ack/resolve | Mock | 评估引擎已可判越界落库 |
+| 事件投递日志 | ✅ 真实 `/monitor/delivery-logs` + `delivery-stats` | Mock | dest/http_code 待 Destinations 回写真实值 |
+| 指标自动采集 | ⛔ 待建（无埋点） | — | 现靠采集端手动 POST；可先映射 `merge_log` 试跑 |
+| 告警周期调度 + 通知下发 | ⛔ 待建 | — | evaluate 已可手动触发，缺定时器与邮件/飞书发送 |
 
 ### 3.4 依赖与集成
 
@@ -114,21 +210,22 @@
 
 ## 4. TODOs
 
-**P0（先把日志/吞吐用真实信号跑通）**
+**已完成（本轮）**
 
-- [后端] 新增 `GET /monitor/logs`，先直接映射 id-mapping `GET /merge-log/{tenant}` 作为事件日志雏形。
-- [数据] 在 `POST /events/process` / `POST /etl/import` 加埋点，记录 tenant/source/成功失败/耗时。
-- [前端] `EventLogsPage` 改读 `/monitor/logs`，摘掉 `MockTag`。
+- ✅ [数据] 建 `monitor_metrics` / `monitor_alert_rule` / `monitor_alert_event` / `event_delivery_log` 四表（`sql/migrate_modules.sql`）。
+- ✅ [后端] `monitor_api.py`：总览/时序/upsert/数据源汇总、投递日志读写 + 分组统计、告警规则 CRUD、规则评估、触发记录确认/解决，共 19 端点；pytest 全局 411P/0F/2S。
 
-**P1（指标聚合 + 概览接真）**
+**P0（前端接真）**
 
-- [数据] 建 `monitor_metrics` 聚合表 + 分钟桶聚合任务。
-- [后端] 实现 `GET /monitor/metrics`、`GET /monitor/sources`。
-- [前端] `DeliveryPage` 接真（指标卡 + `Sparkline` series + 数据源健康表）。
+- [前端] `DeliveryPage` 接 `GET /monitor/overview` + `/monitor/metrics` + `/monitor/sources`（指标卡 + `Sparkline` + 数据源表），摘 `MockTag`。
+- [前端] `EventLogsPage` 接 `GET /monitor/delivery-logs`（按 source/dest/status 过滤），摘 `MockTag`。
+- [前端] `AlertsPage` 补「新建/编辑告警」表单（对接 POST/PUT `/monitor/alert-rules`），展示真实触发记录（`/monitor/alert-events`）+ ack/resolve 操作。
+
+**P1（采集自动化）**
+
+- [数据] 在 `POST /events/process` / `POST /etl/import` 加埋点中间件，自动调用 `POST /monitor/metrics` + `/monitor/delivery-logs`；可先映射 id-mapping `merge_log` 试跑吞吐/日志。
 
 **P2（告警闭环）**
 
-- [数据] 建 `monitor_alert_rule` / `monitor_alert_event` 表。
-- [后端] 告警规则 CRUD + 评估引擎 + 通知渠道（邮件/飞书）。
-- [前端] `AlertsPage` 补「新建/编辑告警」表单，展示真实触发记录。
-- [后端] 与 01-Connections Destinations 集成，回写每事件→目的地投递状态到 `event_delivery_log`。
+- [后端] 告警评估周期调度器（定时遍历启用规则调 evaluate）+ 通知渠道下发（邮件/飞书 webhook，读 `channel`/`channel_config`）。
+- [后端] 与 01-Connections Destinations 集成，回写每事件→目的地真实投递状态（dest/status/http_code）到 `event_delivery_log`。

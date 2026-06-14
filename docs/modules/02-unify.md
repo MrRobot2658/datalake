@@ -1,6 +1,8 @@
 # 模块 02 · 统一 Unify
 
-> 状态：**大部分真实**（Profiles/身份/计算特征），部分 Mock · 对标 Segment Unify
+> 状态：**核心已接真**（Profiles/身份解析规则/泛对象标签/动态群组/SQL 特征/预测推理/档案回流均已落库），少量前端待接 · 对标 Segment Unify
+>
+> 本轮（2026-06）落地：新建 `identity_resolution_rules` / `object_tags` / `object_group_members` / `sql_trait_definitions` / `sql_trait_results` / `prediction_models` 六张表并扩展 `tag_definitions.object_type`、`user_groups.member_object_type`；后端新增 `services/sql-engine/unify_api.py`（独立 `APIRouter`，prefix `/unify`）共 18 个端点，覆盖身份解析规则 CRUD、任意对象打标、动态群组刷新、SQL 特征定义/执行落库、预测模型配置/推理、档案回流、叠加标签的泛对象搜索。全局验收 pytest 411 通过 / 0 失败 / 2 跳过。
 
 ## 1. 概述
 
@@ -62,10 +64,16 @@
 | `id_mapping` / `doris_id_mapping` | 表 | — | channel → one_id 映射 | 已存在 |
 | `merge_log` | 表 | — | OneID 合并日志 | 已存在 |
 | `one_id_sequence` | 表 | — | OneID 发号器 | 已存在 |
-| `tag_definitions` | 表 | — | 标签/计算特征定义 | 已存在 |
-| 身份解析规则 | 表 | — | merge 策略 / 上限 / 唯一性配置 | 待建 |
-| SQL Trait 定义 | 表 | — | trait SQL + 落库结果 | 待建 |
-| Prediction 模型 | 表 | — | 模型配置 + 评分结果 | 待建 |
+| `tag_definitions` | 表 | — | 标签/计算特征定义；本轮 `_add_col` 增 `object_type VARCHAR(32) NOT NULL DEFAULT '*'`（适用对象类型，`*`=通用）+ `idx_object_type(tenant_id,object_type)` | 已存在·已扩展 |
+| `user_groups` | 表 | — | 群组；本轮 `_add_col` 增 `member_object_type VARCHAR(32) NOT NULL DEFAULT 'user'` + `idx_member_type(tenant_id,member_object_type)` | 已存在·已扩展 |
+| `identity_resolution_rules` | 表 | `(tenant_id, rule_id)` | 身份解析规则：`identifier_type / priority(1-100) / max_per_profile / is_unique / is_primary / merge_strategy(take_min/take_max/latest) / enabled`；`UNIQUE(tenant_id,identifier_type)`、`idx_priority(tenant_id,priority)` | **已建** |
+| `object_tags` | 表 | `(tenant_id, object_type, object_id, tag_code)` | 任意对象打标：`source(manual/computed/imported) / assigned_by / assigned_at`；`idx_object(tenant_id,object_type,object_id)`、`idx_tag(tenant_id,tag_code)` | **已建** |
+| `object_group_members` | 表 | `(tenant_id, group_id, object_type, object_id)` | 泛对象群组成员（不改既有 `user_group_members` PK）：`source(manual/dynamic/imported) / added_at`；`idx_object(tenant_id,object_type,object_id)` | **已建** |
+| `sql_trait_definitions` | 表 | `(tenant_id, trait_id)` | SQL 特征定义：`trait_code / trait_name / sql_query(TEXT) / warehouse_type / warehouse_id / schedule_type(manual/hourly/daily) / schedule_cron / result_table / last_run_time / last_row_count / enabled`；`UNIQUE(tenant_id,trait_code)`、`idx_schedule(tenant_id,schedule_type)` | **已建** |
+| `sql_trait_results` | 表 | `(tenant_id, trait_id, object_type, object_id)` | SQL 特征结果：`trait_value VARCHAR(512) / computed_at / version`；`idx_trait(tenant_id,trait_id)`、`idx_computed(computed_at)` | **已建** |
+| `prediction_models` | 表 | `(tenant_id, model_id)` | 预测模型配置：`model_name / model_type(purchase/churn/ltv) / target_event / features(JSON) / training_data_days / inference_horizon / quality_score DECIMAL(5,2) / last_training_at / last_inference_at / enabled`；`UNIQUE(tenant_id,model_name)` | **已建** |
+
+> 档案回流复用连接模块表 `connections_reverse_etl_jobs` / `connections_reverse_etl_runs`（见 [01-connections](./01-connections.md)），不在本模块重复建表。预测推理结果写入 `doris_user_wide.properties.pred_<model>`（JSON_SET）。本模块所有新表均 `CREATE TABLE IF NOT EXISTS`、`DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`、每张含 `tenant_id`，定义见 `sql/migrate_modules.sql`（02 · unify 段），经 `scripts/apply_migrations.sh` 应用。
 
 **关系矩阵（来自 metadata，已实现）**：`lead belongs_to user`、`user owns account`、`account purchased product`、`user visited store`、`user placed order`、`order contains product`。边字段统一含 `create_time`，外加各关系声明的 `properties.*`（如 `purchased.amount/quantity/channel`、`visited.duration`、`placed.channel`、`contains.quantity`）。
 
@@ -149,18 +157,60 @@
 | `GET /mapping/{t}/{channel_type}/{channel_id}` | id-mapping | `id_mapping` | 已实现 |
 | `GET /merge-log/{t}` | id-mapping | `merge_log` | 已实现 |
 | `POST /events/process`、`POST /users/import` | id-mapping | 宽表 + 映射 | 已实现 |
-| 身份解析规则 CRUD | id-mapping | （待建表）| 待建 |
-| SQL Trait 执行/落库 | sql-engine | （待建表）| 待建 |
-| Predictions 评分 | （新服务）| （待建表）| 待建 |
-| Profiles Sync 回流 | （新服务）| — | 待建 |
+| `GET/POST/DELETE /unify/identity-rules/{tenant_id}[/{rule_id}]` | sql-engine `unify_api.py` | `identity_resolution_rules` | **已实现**（列表/upsert/删除）|
+| `POST /unify/tags/{tenant_id}/{code}/assign`、`DELETE …/object/{type}/{id}`、`GET /unify/object-tags/{tenant_id}/{type}/{id}` | sql-engine `unify_api.py` | `object_tags` | **已实现**（任意对象打标/去标/查标）|
+| `GET /unify/groups/{tenant_id}`、`POST /unify/groups/{tenant_id}/{group_id}/refresh` | sql-engine `unify_api.py` | `user_groups` + `object_group_members` | **已实现**（动态群组按 `filter_rule` 刷新成员）|
+| `POST/GET /unify/sql-traits/{tenant_id}`、`POST …/{trait_id}/execute`、`POST …/execute` | sql-engine `unify_api.py` | `sql_trait_definitions` / `sql_trait_results` | **已实现**（定义 + 执行落库）|
+| `POST/GET /unify/predictions/{tenant_id}`、`POST …/{model_id}/infer` | sql-engine `unify_api.py` | `prediction_models` + `doris_user_wide.properties` | **已实现**（配置 + 模拟推理写宽表）|
+| `POST /unify/profiles/sync/{tenant_id}` | sql-engine `unify_api.py` | `connections_reverse_etl_jobs` / `_runs` | **已实现**（注册任务 + 执行一次回流）|
+| `POST /unify/objects/search` | sql-engine `unify_api.py` | object 表 + `object_relations` + `object_tags` | **已实现**（在 `ObjectService` 之上叠加标签过滤）|
 
 **核心实现要点（`objects.py`）**：`OBJECT_REGISTRY` 注册各对象的表/主键/字段类型；`RELATION_MATRIX` 约束合法 `(src,rel,dst)`；`build_sql` 把筛选编译为参数化 SQL（不执行，供 S2 DSL 复用），`_build_relations` 递归展开关系树，每跳 target 成为下一跳锚点实现链式多跳，`_count_hops > MAX_HOPS(3)` 拒绝；`_edge_col` 仅允许 `create_time` / `properties.<key>`（白名单防注入）；`user.one_id` 为数值，与 `object_relations.src_id/dst_id`(VARCHAR) 比较时双向 CAST。
+
+### 3.5 逻辑设计（本轮 `/unify` 端点）
+
+实现位于 `services/sql-engine/unify_api.py`：自带 `APIRouter(prefix="/unify")` 与 `UnifyService`、本地 Pydantic 模型，**不改 `main.py` / `schemas.py` / 既有 service**（只 include router）。所有写操作参数化、按 `tenant_id` 隔离；圈人一律复用 `ObjectService.search`（validate→compile），不手拼业务筛选 SQL。统一异常包装 `_wrap`：`ObjectError → 400`、`Duplicate → 409`、其余 `→ 500`。
+
+| Method · Path | 请求体 | 响应 | 说明 |
+|---|---|---|---|
+| `GET /unify/identity-rules/{tenant_id}` | — | 规则数组（按 priority 升序）| 列出身份解析规则 |
+| `POST /unify/identity-rules/{tenant_id}` | `IdentityRuleIn{identifier_type, priority=50, max_per_profile?, is_unique, is_primary, merge_strategy?, description?, enabled}` | 落库后的规则行 | upsert；`rule_id` 缺省取 `rule_<identifier_type>`；`ON DUPLICATE KEY` |
+| `DELETE /unify/identity-rules/{tenant_id}/{rule_id}` | — | `{ok:true}` / 404 | 删除规则 |
+| `POST /unify/tags/{tenant_id}/{code}/assign` | `TagAssignIn{object_type, object_id, source=manual, assigned_by?}` | `object_tags` 行 | 给任意对象实例打标；`object_type` 必须在 `OBJECT_REGISTRY` |
+| `DELETE /unify/tags/{tenant_id}/{code}/object/{object_type}/{object_id}` | — | `{ok:true}` / 404 | 去标 |
+| `GET /unify/object-tags/{tenant_id}/{object_type}/{object_id}` | — | `{tags:[...]}` | 查某对象的全部标签 |
+| `GET /unify/groups/{tenant_id}?filter_type=static\|dynamic` | — | 群组数组（`filter_rule` 已 JSON 解析）| 列群组，可按 `group_type` 过滤 |
+| `POST /unify/groups/{tenant_id}/{group_id}/refresh` | — | `{matched, member_count, object_type, source:dynamic}` | 动态群组刷新（见下算法）|
+| `POST /unify/sql-traits/{tenant_id}` | `SqlTraitIn{trait_code, sql_query, warehouse_type=mysql, schedule_type=manual, result_table?, object_type=user, enabled}` | 定义行 | upsert SQL 特征定义 |
+| `GET /unify/sql-traits/{tenant_id}` | — | 定义数组（含 `result_count` 子查询计数）| 列特征定义 |
+| `POST /unify/sql-traits/{tenant_id}/{trait_id}/execute` | — | `{executed, row_count, elapsed_ms, traits[]}` | 执行单个特征并落库 |
+| `POST /unify/sql-traits/{tenant_id}/execute` | `SqlTraitExecuteIn{trait_id?}` | 同上 | `trait_id` 缺省执行该租户全部 `enabled` 特征 |
+| `POST /unify/predictions/{tenant_id}` | `PredictionModelIn{model_name, model_type, target_event?, features[], training_data_days?, inference_horizon?, enabled}` | 模型行（`features` 已解析）| upsert 预测模型 |
+| `GET /unify/predictions/{tenant_id}` | — | 模型数组 | 列模型 |
+| `POST /unify/predictions/{tenant_id}/{model_id}/infer` | — | `{property_key, row_count, quality_score, elapsed_ms}` | 模拟推理写宽表 |
+| `POST /unify/profiles/sync/{tenant_id}` | `ProfileSyncIn{target_warehouse, source_object=doris_user_wide, tables[], schedule?}` | `{job_id, run_id, status, row_count}` | 注册回流任务 + 执行一次 |
+| `POST /unify/objects/search` | `UnifyObjectSearchIn{tenant_id, object, conditions[], relations[], tag_codes[], tag_logic=or, logic=AND, limit=50, count_only}` | `SearchResult`（命中行回填 `object_tags`）| 泛对象搜索 + 标签过滤 |
+
+**核心算法 / 流程**
+
+- **动态群组刷新 `refresh_group`**：读 `user_groups.filter_rule`（须含 `conditions` 或 `relations`，否则 400）→ 取 `object_type = rule.object || member_object_type || user` 与其主键字段 → 调 `ObjectService.search(limit=100000)` 拿命中主键集 → 事务内先 `DELETE … source='dynamic'` 再 `executemany INSERT … ON DUPLICATE KEY`（仅替换动态成员，保留 manual 成员）→ 回写 `user_groups.member_count`。
+- **SQL 特征执行 `execute_sql_traits`**：安全闸 `_assert_readonly`——仅单条语句（拒分号）、必须 `^(select|with)`、必须含 `tenant_id`；以命名参数 `{"tenant_id": …}` 执行（失败回退无参执行）；结果行须含 `object_id` 与 `trait_value`（否则 400），`object_type` 缺省 `user`；`ON DUPLICATE KEY` 落 `sql_trait_results`（`version+1`）并回写定义的 `last_run_time/last_row_count`。
+- **预测推理 `infer_prediction`**（dev 模拟，非真实模型）：取目标租户 `doris_user_wide.one_id`，按 `hash((model_id, one_id))` 生成确定性伪分值，`JSON_SET(properties, '$.pred_<safe_model>', score)` 写回宽表；`<safe_model>` 经 `_safe_key` 收敛为 `[0-9A-Za-z_]` 后作为绑定参数路径防注入；回写模型 `quality_score/last_inference_at`。
+- **档案回流 `sync_profiles`**：upsert `connections_reverse_etl_jobs` → 统计源对象当前租户行数为 `row_count` → 插一条 `connections_reverse_etl_runs` → 累加 `total_synced_rows`。
+- **泛对象搜索 `search_with_tags`**：无 `tag_codes` 时直通 `ObjectService.search`（含 `count_only`）；有标签时先取候选（limit=5000），再用 `_tag_matched_ids`（`object_tags` 按 `tag_logic` and/or 计 `COUNT(DISTINCT tag_code)` 命中阈值）求交集，命中行回填全部标签。
+
+**与其他模块依赖**
+
+- 内部复用 `objects.py` 的 `OBJECT_REGISTRY` / `ObjectError` / `ObjectService`（圈人与对象类型校验）、`executor.py` 的 `MysqlOlapExecutor`（连接配置）。
+- 档案回流写入连接模块 [01-connections](./01-connections.md) 的 `connections_reverse_etl_jobs` / `_runs`。
+- 标签/群组扩展与 [03-objects](./03-objects.md) 的对象注册表、[05-engage](./05-engage.md) 的受众共用筛选引擎与成员模型。
 
 ### 3.3 真实 vs Mock 边界
 
 - **真实**：用户档案检索与详情、对象 Hub/列表、客户列表/详情、跨对象关系查询（含链式多跳与边条件）、计算特征只读展示。全部走 `/api/*` → SQL Engine `:8002` / ID-Mapping `:8001` → MySQL `:3308`，按 `tenant_id` 隔离。
-- **Mock**：身份解析规则配置（`identityRules`）、SQL Traits（`sqlTraits`）、Predictions（`predictions`）、Profiles Sync（`profilesSync`）—— 均来自 `frontend/src/mock/data.ts`，仅前端展示。
-- **半真**：计算特征仅「读」`/tags`，缺少 Segment 式拖拽构建器与定时计算落库。
+- **本轮转真（后端已落库，前端待接）**：身份解析规则 CRUD、任意对象打标、动态群组刷新、SQL 特征定义/执行落库、预测模型配置/推理、档案回流——后端 `/unify/*` 已实数据链路（真实读写 MySQL），前端 `/unify/identity` `/unify/sql-traits` `/unify/predictions` `/unify/sync` 仍指向 `frontend/src/mock/data.ts`，待切到 `/unify/*` API。
+- **仍为模拟**：预测推理为 dev 确定性伪分值（非真实模型训练/评分）；SQL 特征执行在 MySQL 上跑（模拟数仓）；档案回流仅注册任务并以源行数计数（不真正写外部仓）。
+- **半真**：计算特征仅「读」`/tags`，缺少 Segment 式拖拽构建器；定时计算依赖调度（[08-monitor](./08-monitor.md)）尚未接入，现为手动 `execute`。
 
 ### 3.4 依赖与集成
 
@@ -173,19 +223,23 @@
 ## 4. TODOs
 
 **P0（把核心 Mock 接真）**
-- [ ] [后端] 身份解析规则表 + CRUD 端点：merge 策略 / 标识符优先级 / 合并上限 / 唯一性约束；`POST /events/process` 读取规则执行 merge。
-- [ ] [前端] `/unify/identity` 接真实规则 API，替换 `identityRules`；展示 `merge-log`。
+- [x] [后端] 身份解析规则表 + CRUD 端点：merge 策略 / 标识符优先级 / 合并上限 / 唯一性约束（`identity_resolution_rules` + `/unify/identity-rules/*`）。
+- [ ] [后端] `POST /events/process` 读取 `identity_resolution_rules` 执行 merge（规则已建，merge 逻辑尚未接读规则）。
+- [ ] [前端] `/unify/identity` 接 `/unify/identity-rules/*`，替换 `identityRules`；展示 `merge-log`。
 - [ ] [数据] 校验关系矩阵与边字段元数据与实际数据一致（`purchased/visited/placed/contains` 的 `properties.*`）。
 
 **P1（特征 / 标签 / 群组，见 §2.5）**
-- [ ] [后端] 标签通用化：`tag_definitions` 增 `object_type` + 新增 `object_tags` 关联表（迁移）；`objects/search` 支持按标签筛选；任意对象可打标。
-- [ ] [后端] 群组动态化：`groups.py` 执行 `filter_rule`（复用 `objects/search`）；`user_groups` 增 `member_object_type`、`group_members` 增 `source`；动态群组查询期计算 / 调度刷新。
+- [x] [后端] 标签通用化：`tag_definitions` 增 `object_type` + 新增 `object_tags` 关联表；`/unify/objects/search` 支持按标签筛选；任意对象可打标（`/unify/tags/*`）。
+- [x] [后端] 群组动态化：`refresh_group` 执行 `filter_rule`（复用 `ObjectService.search`）；`user_groups` 增 `member_object_type`、新增 `object_group_members(source)`；动态群组调度刷新落库。
+- [x] [后端] SQL Traits 执行器：`sql_trait_definitions` 跑只读 SQL → 落 `sql_trait_results`；`/unify/sql-traits/*` 已接真（执行在 MySQL 模拟数仓）。
 - [ ] [前端] 标签管理页 `/unify/tags`（按对象类型）、群组页 `/unify/groups`（动态/静态、与受众互通）。
 - [ ] [前端] Computed Traits 拖拽构建器：基于 `objects/search` 条件 + 聚合，生成 trait 定义（当前仅只读 `/tags`）。
-- [ ] [后端] SQL Traits 执行器：数仓跑 SQL → 落 `tag_definitions`/trait 结果表；`/unify/sql-traits` 接真。
+- [ ] [前端] SQL 特征页 `/unify/sql-traits` 接 `/unify/sql-traits/*`，替换 `sqlTraits`。
 - [ ] [前端] 用户档案详情补充关联对象（订单/门店/产品）面板，复用关系查询。
 
 **P2（预测与回流）**
-- [ ] [后端] Predictions 模型服务：训练/评分，结果写入宽表 `properties`；`/unify/predictions` 接真。
-- [ ] [后端] Profiles Sync：宽表/特征回流数仓或外部仓；`/unify/sync` 接真。
+- [x] [后端] Predictions 模型配置 + 推理：`prediction_models` + `/unify/predictions/*`，结果写宽表 `properties.pred_*`（dev 模拟评分，待接真实模型）。
+- [x] [后端] Profiles Sync：`/unify/profiles/sync/*` 注册 `connections_reverse_etl_jobs` 并执行一次（待接真实外部仓写入）。
+- [ ] [后端] 预测接真实模型训练/评分；SQL 特征/特征计算接调度（[08-monitor](./08-monitor.md)）定时执行。
+- [ ] [前端] `/unify/predictions`、`/unify/sync` 接 `/unify/*` API，替换 `predictions` / `profilesSync`。
 - [ ] [前端] `DataTable` 分页/排序/导出，提升大结果集（limit≤1000）浏览体验。
