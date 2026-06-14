@@ -12,10 +12,10 @@ const COUNTED = ["user", "account", "order", "product", "store"];
 // 对象卡 → Segment IA 路由
 const ROUTE: Record<string, string> = {
   user: "/unify",
-  account: "/unify/objects/account",
-  order: "/unify/objects/order",
-  product: "/unify/objects/product",
-  store: "/unify/objects/store",
+  account: "/accounts",
+  order: "/objects/order",
+  product: "/objects/product",
+  store: "/objects/store",
   tag: "/engage/traits",
   segment: "/engage",
 };

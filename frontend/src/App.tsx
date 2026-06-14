@@ -3,10 +3,14 @@ import { TenantProvider } from "./context/TenantContext";
 import Dashboard from "./pages/Dashboard";
 import FilterPage from "./pages/FilterPage";
 import EtlPage from "./pages/EtlPage";
+import EtlFlowPage from "./pages/EtlFlowPage";
 import ObjectListPage from "./pages/ObjectListPage";
 import ConnectionsPage from "./pages/ConnectionsPage";
 import DestinationsPage from "./pages/DestinationsPage";
 import UnifyPage from "./pages/UnifyPage";
+import ObjectsHubPage from "./pages/ObjectsHubPage";
+import AccountsPage from "./pages/AccountsPage";
+import AccountDetailPage from "./pages/AccountDetailPage";
 import EngagePage from "./pages/EngagePage";
 import TagsPage from "./pages/TagsPage";
 
@@ -60,6 +64,7 @@ export default function App() {
           <Route path="/connections/reverse-etl" element={<ReverseEtlPage />} />
           <Route path="/connections/warehouses" element={<WarehousesPage />} />
           <Route path="/connections/functions" element={<FunctionsPage />} />
+          <Route path="/connections/flow" element={<EtlFlowPage />} />
           <Route path="/connections/sources/new" element={<EtlPage />} />
           <Route path="/connections/sources/:id" element={<SourceDetailPage />} />
 
@@ -71,7 +76,12 @@ export default function App() {
           <Route path="/unify/predictions" element={<PredictionsPage />} />
           <Route path="/unify/sync" element={<ProfilesSyncPage />} />
           <Route path="/unify/profiles/:id" element={<ProfileDetailPage />} />
-          <Route path="/unify/objects/:key" element={<ObjectListPage />} />
+
+          {/* 对象管理 / 客户管理（一级菜单） */}
+          <Route path="/objects" element={<ObjectsHubPage />} />
+          <Route path="/objects/:key" element={<ObjectListPage />} />
+          <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/accounts/:id" element={<AccountDetailPage />} />
 
           {/* Engage */}
           <Route path="/engage" element={<EngagePage />} />
@@ -105,6 +115,10 @@ export default function App() {
           <Route path="/filter" element={<Navigate to="/engage/audiences/new" replace />} />
           <Route path="/etl" element={<Navigate to="/connections/sources/new" replace />} />
           <Route path="/engage/traits" element={<Navigate to="/unify/traits" replace />} />
+          <Route path="/unify/objects" element={<Navigate to="/objects" replace />} />
+          <Route path="/unify/objects/:key" element={<ObjectListPage />} />
+          <Route path="/unify/accounts" element={<Navigate to="/accounts" replace />} />
+          <Route path="/unify/accounts/:id" element={<AccountDetailPage />} />
           <Route path="/objects/:key" element={<ObjectListPage />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />

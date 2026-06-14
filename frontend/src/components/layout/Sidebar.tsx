@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import { HOME, SECTIONS, FOOTER_SECTION, type NavChild, type NavSection } from "../../lib/nav";
 
 const rowBase =
@@ -34,25 +36,42 @@ function ChildItem({ item }: { item: NavChild }) {
   );
 }
 
-function Section({ section, expanded }: { section: NavSection; expanded: boolean }) {
+// 有子菜单：父级仅展开/收起，不跳转；落地页交给子菜单。
+// 当路由进入本分区时自动展开；之后尊重用户的手动开合。
+function CollapsibleSection({ section, sectionActive }: { section: NavSection; sectionActive: boolean }) {
+  const [open, setOpen] = useState(sectionActive);
+  useEffect(() => {
+    if (sectionActive) setOpen(true);
+  }, [sectionActive]);
+
   return (
     <div>
-      <NavLink
-        to={section.to}
-        end
-        className={({ isActive }) => `${rowBase} ${isActive ? active : idle}`}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`${rowBase} w-full text-left ${sectionActive ? active : idle}`}
       >
         <section.icon className="h-[18px] w-[18px] shrink-0" />
         <span className="flex-1 font-medium">{section.label}</span>
         <span className="text-[11px] font-normal text-gray-400">{section.term}</span>
-      </NavLink>
-      {expanded && section.children && (
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && section.children && (
         <div className="mt-1 space-y-0.5">
           {section.children.map((c) => <ChildItem key={c.to} item={c} />)}
         </div>
       )}
     </div>
   );
+}
+
+function Section({ section, sectionActive }: { section: NavSection; sectionActive: boolean }) {
+  // 无子菜单的分区（如「客户」）保持普通跳转链接；有子菜单的父级仅展开。
+  return section.children
+    ? <CollapsibleSection section={section} sectionActive={sectionActive} />
+    : <TopItem item={section} />;
 }
 
 export default function Sidebar() {
@@ -77,12 +96,12 @@ export default function Sidebar() {
           Workspace
         </div>
         {SECTIONS.map((s) => (
-          <Section key={s.to} section={s} expanded={pathname === s.to || pathname.startsWith(s.to + "/")} />
+          <Section key={s.to} section={s} sectionActive={pathname === s.to || pathname.startsWith(s.to + "/")} />
         ))}
         <div className="!mt-3 border-t border-gray-200 pt-3">
           <Section
             section={FOOTER_SECTION}
-            expanded={pathname === FOOTER_SECTION.to || pathname.startsWith(FOOTER_SECTION.to + "/")}
+            sectionActive={pathname === FOOTER_SECTION.to || pathname.startsWith(FOOTER_SECTION.to + "/")}
           />
         </div>
       </nav>

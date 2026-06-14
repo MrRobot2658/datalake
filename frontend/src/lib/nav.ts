@@ -26,6 +26,7 @@ export const SECTIONS: NavSection[] = [
     label: "连接", term: "Connections", to: "/connections", icon: Plug,
     children: [
       { label: "数据源", term: "Sources", to: "/connections", icon: Upload },
+      { label: "可视化编排", term: "Pipelines", to: "/connections/flow", icon: Route },
       { label: "目的地", term: "Destinations", to: "/connections/destinations", icon: Download },
       { label: "Reverse ETL", term: "Reverse ETL", to: "/connections/reverse-etl", icon: RefreshCw },
       { label: "数据仓库", term: "Warehouses", to: "/connections/warehouses", icon: Database },
@@ -42,6 +43,17 @@ export const SECTIONS: NavSection[] = [
       { label: "预测", term: "Predictions", to: "/unify/predictions", icon: Sparkles },
       { label: "档案同步", term: "Profiles Sync", to: "/unify/sync", icon: Cloud },
     ],
+  },
+  {
+    label: "对象", term: "Objects", to: "/objects", icon: Boxes,
+    children: [
+      { label: "门店", term: "Stores", to: "/objects/store", icon: Store },
+      { label: "产品", term: "Products", to: "/objects/product", icon: Package },
+      { label: "订单", term: "Orders", to: "/objects/order", icon: ShoppingCart },
+    ],
+  },
+  {
+    label: "客户", term: "Accounts", to: "/accounts", icon: Building2,
   },
   {
     label: "触达", term: "Engage", to: "/engage", icon: Megaphone,

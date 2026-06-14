@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FileSpreadsheet, Database, Radio, Cloud, Plus, ArrowRight, CheckCircle2 } from "lucide-react";
+import { FileSpreadsheet, Database, Radio, Cloud, Plus, ArrowRight, CheckCircle2, Workflow } from "lucide-react";
 import Layout from "../components/layout/Layout";
 import { Card, Badge, Button } from "../components/ui";
 
@@ -20,9 +20,14 @@ export default function ConnectionsPage() {
       title="数据源 Sources"
       subtitle="把数据接入 Segment —— 一次接入，导入任意对象（Track once, send everywhere）"
       actions={
-        <Link to="/connections/sources/new">
-          <Button><Plus className="h-4 w-4" /> 添加数据源</Button>
-        </Link>
+        <>
+          <Link to="/connections/flow">
+            <Button variant="outline"><Workflow className="h-4 w-4" /> 可视化编排</Button>
+          </Link>
+          <Link to="/connections/sources/new">
+            <Button><Plus className="h-4 w-4" /> 添加数据源</Button>
+          </Link>
+        </>
       }
     >
       <div className="mb-2 text-sm font-semibold text-gray-700">已连接 · Connected</div>

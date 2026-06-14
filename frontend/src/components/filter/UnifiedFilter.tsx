@@ -10,7 +10,7 @@ import RelationEditor from "./RelationEditor";
 
 const searchableObjects = OBJECTS.filter((o) => o.kind === "object");
 
-export default function UnifiedFilter({ baseObject, lockBase, autoSearch }: { baseObject?: string; lockBase?: boolean; autoSearch?: boolean }) {
+export default function UnifiedFilter({ baseObject, lockBase, autoSearch, rowLink }: { baseObject?: string; lockBase?: boolean; autoSearch?: boolean; rowLink?: (row: Record<string, any>) => string | undefined }) {
   const { tenant } = useTenant();
   const [meta, setMeta] = useState<Metadata | null>(null);
   const [rule, setRule] = useState<DslRule>({
@@ -224,8 +224,10 @@ export default function UnifiedFilter({ baseObject, lockBase, autoSearch }: { ba
       {/* 明细 */}
       {rows && (
         <Card className="p-2">
-          <div className="px-3 pb-2 pt-3 text-sm font-semibold text-gray-700">命中明细（最多 50 条）</div>
-          <DataTable columns={rows[0] ? Object.keys(rows[0]).slice(0, 8) : ["结果"]} rows={rows} />
+          <div className="px-3 pb-2 pt-3 text-sm font-semibold text-gray-700">
+            命中明细（最多 50 条）{rowLink && <span className="ml-2 font-normal text-gray-400">· 点击行查看详情</span>}
+          </div>
+          <DataTable columns={rows[0] ? Object.keys(rows[0]).slice(0, 8) : ["结果"]} rows={rows} rowLink={rowLink} />
         </Card>
       )}
 

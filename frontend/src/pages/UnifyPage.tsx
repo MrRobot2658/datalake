@@ -31,7 +31,7 @@ export default function UnifyPage() {
             <div className="font-semibold text-gray-900">关联对象 Linked Objects</div>
             <div className="mt-1 flex flex-wrap gap-2">
               {linked.map((o) => (
-                <Link key={o.key} to={`/unify/objects/${o.key}`}
+                <Link key={o.key} to={`/objects/${o.key}`}
                   className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200">
                   <o.icon className="h-3.5 w-3.5" /> {o.label}
                 </Link>
@@ -48,7 +48,7 @@ export default function UnifyPage() {
           基于筛选创建受众 <ArrowRight className="h-4 w-4" />
         </Link>
       </div>
-      <UnifiedFilter baseObject="user" lockBase autoSearch />
+      <UnifiedFilter baseObject="user" lockBase autoSearch rowLink={(r) => (r.one_id != null ? `/unify/profiles/${r.one_id}` : undefined)} />
     </Layout>
   );
 }

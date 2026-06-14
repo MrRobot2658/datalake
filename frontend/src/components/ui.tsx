@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useNavigate } from "react-router-dom";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
@@ -46,7 +47,13 @@ export function Button({
   );
 }
 
-export function DataTable({ columns, rows }: { columns: string[]; rows: Record<string, any>[] }) {
+export function DataTable({ columns, rows, rowLink }: {
+  columns: string[];
+  rows: Record<string, any>[];
+  /** 返回链接则该行可点击进入详情 */
+  rowLink?: (row: Record<string, any>) => string | undefined;
+}) {
+  const navigate = useNavigate();
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
@@ -61,13 +68,20 @@ export function DataTable({ columns, rows }: { columns: string[]; rows: Record<s
           {rows.length === 0 && (
             <tr><td colSpan={columns.length} className="px-4 py-10 text-center text-gray-400">无数据</td></tr>
           )}
-          {rows.map((r, i) => (
-            <tr key={i} className="hover:bg-gray-50">
-              {columns.map((c) => (
-                <td key={c} className="whitespace-nowrap px-4 py-3 text-gray-700">{fmt(r[c])}</td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((r, i) => {
+            const link = rowLink?.(r);
+            return (
+              <tr
+                key={i}
+                onClick={link ? () => navigate(link) : undefined}
+                className={`hover:bg-gray-50 ${link ? "cursor-pointer" : ""}`}
+              >
+                {columns.map((c) => (
+                  <td key={c} className="whitespace-nowrap px-4 py-3 text-gray-700">{fmt(r[c])}</td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
