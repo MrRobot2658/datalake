@@ -148,7 +148,26 @@ export async function getRecordRelations(
   const { data } = await http.get(
     `/objects/${tenant}/${objectKey}/${pkValue}/relations`,
   );
-  // 兼容 {relations:[...]} 或直接数组
-  if (Array.isArray(data)) return data;
-  return data?.relations ?? [];
+  const rel = Array.isArray(data) ? data : data?.relations;
+  if (Array.isArray(rel)) return rel;
+  // 后端按 rel_type 分组的字典：{rel_type: [{object_key,id,direction,properties,create_time}]}，展平为数组
+  if (rel && typeof rel === "object") {
+    const out: RecordRelation[] = [];
+    for (const [rel_type, items] of Object.entries(rel as Record<string, any[]>)) {
+      for (const it of items ?? []) {
+        const peer = it.object_key ?? it.other_type;
+        const peerId = it.id ?? it.other_id;
+        const reverse = it.direction === "reverse";
+        out.push({
+          rel_type,
+          direction: it.direction,
+          ...(reverse ? { src_type: peer, src_id: peerId } : { dst_type: peer, dst_id: peerId }),
+          properties: it.properties,
+          create_time: it.create_time,
+        });
+      }
+    }
+    return out;
+  }
+  return [];
 }
