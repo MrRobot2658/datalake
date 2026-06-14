@@ -1,4 +1,4 @@
-# CDP 圈人控制台（前端）
+# AgenticDataHub 控制台（前端）
 
 TailAdmin 风格的 React + Vite + Tailwind 前端，对接 `sql-engine`。
 

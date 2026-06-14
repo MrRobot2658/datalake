@@ -64,7 +64,7 @@ export default function ConnectionsPage() {
   return (
     <Layout
       title={tr("数据源 Sources", "Sources")}
-      subtitle={tr("把数据接入 CDP —— 一次接入，导入任意对象（Track once, send everywhere）", "Connect data to your CDP — track once, send everywhere")}
+      subtitle={tr("把数据接入数据底座 —— 一次接入，导入任意对象（Track once, send everywhere）", "Connect data to the data foundation — track once, send everywhere")}
       actions={
         <>
           <Link to="/connections/flow">

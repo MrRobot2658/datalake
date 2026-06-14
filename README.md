@@ -39,7 +39,7 @@
        id_mapping · user_profile · user_wide
        大租户独立库 + BE Tag，小租户共享库 tenant_id 分区
 
-  ── 查询层（只读）── SQL Engine + CDP Agent ← 业务应用 / MA / BI；模板查询 → Doris / Redis
+  ── 查询层（只读）── SQL Engine + 数据 Agent ← 业务应用 / MA / BI；模板查询 → Doris / Redis
   ── 调度管控层（K8s）── StreamPark：Flink Job 启停扩缩 · DolphinScheduler：离线导入/批标签/运维
 ```
 
