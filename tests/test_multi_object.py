@@ -5,6 +5,7 @@
 """
 
 import requests
+from datetime import date, timedelta
 
 API = "http://localhost:8002"
 # 绕过本机 http_proxy，避免 localhost 被代理
@@ -189,9 +190,14 @@ class TestEdgeConditions:
         any_purchase = search({"object": "user", "count_only": True, "relations": [
             {"rel_type": "owns", "object": "account", "relations": [
                 {"rel_type": "purchased", "object": "product"}]}]}).json()["estimate"]
-        # 上界取次日 00:00，含当天整天（避免 date 上界被当成 00:00:00 漏掉当天）
+        # 近窗口动态计算，避免日期硬编码随时间腐烂：下界取今天往前 31 天，
+        # 上界取「次日」00:00（含当天整天 —— 样例购买的 create_time 是今天的某个时刻，
+        # date 上界被当成 00:00:00 会漏掉当天，故 +1 天）。
+        today = date.today()
+        lo = (today - timedelta(days=31)).isoformat()
+        hi = (today + timedelta(days=1)).isoformat()
         recent = search(self._chain([{"field": "create_time", "op": "between",
-                                      "value": ["2026-05-14", "2026-06-14"]}])).json()["estimate"]
+                                      "value": [lo, hi]}])).json()["estimate"]
         old = search(self._chain([{"field": "create_time", "op": "between",
                                    "value": ["2020-01-01", "2020-12-31"]}])).json()["estimate"]
         assert recent == any_purchase  # 样例购买发生在今天，落在近窗口内
