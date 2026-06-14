@@ -9,11 +9,31 @@ USER="${MYSQL_USER:-agenticdatahub}"
 PASS="${MYSQL_PASSWORD:-agenticdatahub123}"
 DIR="$(cd "$(dirname "$0")/.." && pwd)/sql"
 
-echo "== 应用迁移到 $CONTAINER/$DB =="
-for f in "$DIR"/migrate_*.sql; do
-  [ -e "$f" ] || continue
+# 迁移之间存在依赖：migrate_modules.sql 会 ALTER tag_definitions / user_groups，
+# 这两张表分别由 migrate_tags.sql / migrate_groups.sql 创建。字母序（modules 在 tags
+# 之前）在全新库上会报 "Table 'tag_definitions' doesn't exist"，因此必须按依赖顺序。
+# 先按下列显式顺序应用已知文件，其余新增的 migrate_*.sql 再按字母序补齐。
+ORDER=(doris groups tags modules objects segments)
+
+apply() {
+  local f="$1"
   echo "-> $(basename "$f")"
   docker exec -i "$CONTAINER" mysql --default-character-set=utf8mb4 \
     -u"$USER" -p"$PASS" "$DB" < "$f"
+}
+
+echo "== 应用迁移到 $CONTAINER/$DB =="
+applied=()
+for name in "${ORDER[@]}"; do
+  f="$DIR/migrate_$name.sql"
+  [ -e "$f" ] || continue
+  apply "$f"
+  applied+=("$f")
+done
+# 兜底：应用任何不在显式顺序里的新迁移文件（按字母序）
+for f in "$DIR"/migrate_*.sql; do
+  [ -e "$f" ] || continue
+  [[ " ${applied[*]} " == *" $f "* ]] && continue
+  apply "$f"
 done
 echo "== 迁移完成 =="
