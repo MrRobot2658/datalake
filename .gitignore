@@ -1,6 +1,7 @@
 .env
 node_modules/
-package-lock.json
+# 仅忽略根目录的 lock（文档工具用）；frontend/package-lock.json 需提交以保证 npm ci 可复现
+/package-lock.json
 .venv/
 __pycache__/
 *.pyc
