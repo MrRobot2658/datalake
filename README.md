@@ -8,13 +8,13 @@
 
 **仓库**：https://github.com/MrRobot2658/agenticdatahub
 
-> 设计文档：[模块产品文档](./docs/modules/README.md)（分模块 详细/技术设计 + TODOs）· [docs/design.md](./docs/design.md)（Kafka/Flink/MySQL/Doris 宽表）· [scale-comparison](./docs/scale-comparison.md)（dev→2亿）· [Flink Job 模板](./docs/flink/README.md) · [MCP 调用链路](./docs/MCP调用链路.md) · [前端说明](./frontend/README.md)
+> 设计文档：[模块产品文档](./docs/modules/README.md)（1 平台底座 + 9 业务模块，各含 详细/技术设计 + TODOs）。整理后，跨模块技术文档已并入对应模块：**实时链路架构 / 规模扩展** → [00-platform](./docs/modules/00-platform.md)；**ID-Mapping 画像水平伸缩 / MCP 调用链路** → [02-unify](./docs/modules/02-unify.md)。· [OpenAPI](./swagger/) · [前端说明](./frontend/README.md)
 
 ---
 
 ## 一、架构介绍
 
-目标架构（[CDP 优化方案 V3.0-06](./docs/CDP优化方案V3.0-06.pdf) · 数据链路层级，自上而下）。本地 dev 用 **ID-Mapping 服务 + MySQL** 模拟 Flink/Doris；StreamPark / DolphinScheduler / Doris 为生产目标组件。
+目标架构（数据链路层级，自上而下；详见 [00-platform](./docs/modules/00-platform.md)）。本地 dev 用 **ID-Mapping 服务 + MySQL** 模拟 Flink/Doris；StreamPark / DolphinScheduler / Doris 为生产目标组件。
 
 ```
 图 1 · 数据链路层级（接入 → Kafka → Flink → MySQL → Doris）

@@ -17,6 +17,8 @@
 | 08 | 监控 Monitor | Monitor | 全 Mock | [08-monitor.md](./08-monitor.md) |
 | 09 | 设置 Settings | Settings / IAM | 全 Mock | [09-settings.md](./09-settings.md) |
 
+> 整理后跨模块技术文档已并入对应模块：**实时链路架构设计 + 规模扩展对照** 见 [00-platform](./00-platform.md)；**ID-Mapping 画像水平伸缩方案 + MCP 调用链路** 见 [02-unify](./02-unify.md)。
+
 ## 文档模板（每个模块统一结构）
 
 1. **概述** —— 定位、对标 Segment 的哪块、当前真实/Mock 状态。
