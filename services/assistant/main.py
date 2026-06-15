@@ -38,6 +38,11 @@ MCP_SQL_ENGINE_URL = os.getenv("MCP_SQL_ENGINE_URL", SQL_ENGINE_URL)
 
 MAX_TOOL_ITERS = 5
 
+# 主动式埋点 Copilot 开关
+PROACTIVE_ENABLED = os.getenv("PROACTIVE_ENABLED", "1") not in ("0", "false", "False", "")
+PROACTIVE_COOLDOWN_SEC = int(os.getenv("PROACTIVE_COOLDOWN_SEC", "45"))
+_SUGGEST_COOLDOWN: dict[str, float] = {}  # session_id -> 上次发出建议的时间戳
+
 _TOOL_SCHEMA_CACHE: list[dict] | None = None
 _TASK_STORE: list[dict] = []
 
@@ -520,3 +525,181 @@ async def get_task(run_id: str) -> dict:
         if str(t.get("run_id")) == str(run_id):
             return t
     raise HTTPException(status_code=404, detail="task not found")
+
+
+# ── 主动式埋点 Copilot ────────────────────────────────────────────────────────
+# 链路：前端 tracker 缓冲行为 → 触发批量 POST /observe → 落库 + 启发式门控 +
+# copilot agent 判断是否主动建议 → 有建议时前端自动展开侧边栏弹出。
+# 两层门控（前端触发点 + 后端启发式）确保 LLM 调用稀疏、成本可控。
+
+class BehaviorEvent(BaseModel):
+    type: str                       # page_view/click/search/empty_state/error/idle/repeat
+    path: str | None = None
+    name: str | None = None
+    ts: int | None = None
+    payload: dict | None = None
+
+
+class ObserveRequest(BaseModel):
+    tenant_id: int
+    user_id: int | None = None
+    session_id: str
+    page: dict | None = None        # {path, name}
+    events: list[BehaviorEvent] = []
+
+
+# 高价值页面 → 首次进入时的贴心提示（title, message）
+PAGE_TIPS: dict[str, tuple[str, str]] = {
+    "/accounts/-/merge-log": ("OneID 合并", "需要我解释这条记录的 OneID 合并规则，或帮你查某个用户的合并历史吗？"),
+    "/unify/identity": ("身份解析", "想了解 channel→OneID 的合并逻辑，或调整身份规则吗？我可以帮你解释。"),
+    "/connections/flow": ("可视化编排", "要我帮你梳理这个 ETL 编排，或基于现有节点跑一条管道吗？"),
+    "/unify/predictions": ("预测模型", "需要我解释购买/流失/LTV 这几个预测分数怎么用来圈人吗？"),
+}
+CREATE_PAGES = {"/engage/audiences/new", "/filter"}  # 新建分群
+
+
+def _save_behavior(req: ObserveRequest) -> None:
+    if not req.user_id or not req.events:
+        return
+    page = req.page or {}
+    try:
+        rows = []
+        for e in req.events:
+            path = e.path or page.get("path")
+            name = e.name or page.get("name") or PAGE_INDEX.get(path or "")
+            rows.append((req.tenant_id, req.user_id, req.session_id, e.type, path, name,
+                         json.dumps(e.payload or {}, ensure_ascii=False)))
+        with _db() as conn, conn.cursor() as cur:
+            cur.executemany(
+                "INSERT INTO user_behavior_events "
+                "(tenant_id,user_id,session_id,event_type,page_path,page_name,payload) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s)", rows)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _save_suggestion(req: ObserveRequest, signal: str, sug: dict) -> None:
+    if not req.user_id:
+        return
+    try:
+        with _db() as conn, conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO proactive_suggestions "
+                "(tenant_id,user_id,session_id,trigger_signal,title,message,action,confidence) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (req.tenant_id, req.user_id, req.session_id, signal, sug.get("title"),
+                 sug.get("message"), json.dumps(sug.get("action") or {}, ensure_ascii=False),
+                 sug.get("confidence")))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _detect_signal(req: ObserveRequest) -> tuple[str | None, str]:
+    """启发式门控：从本批行为中识别「值得主动出手」的信号。无信号返回 (None, '')。"""
+    events = req.events
+    types = {e.type for e in events}
+    page_path = (req.page or {}).get("path") or ""
+    if "error" in types:
+        return "error", page_path
+    if "empty_state" in types:
+        return "empty_result", page_path
+    if "repeat" in types:
+        return "repeat", page_path
+    if "idle" in types:
+        if page_path in CREATE_PAGES:
+            return "stuck_creating", page_path
+        if page_path.startswith("/analyst"):
+            return "stuck_analyst", page_path
+    # 首次进入高价值页（page_view 命中提示页）
+    for e in events:
+        if e.type == "page_view" and (e.path or "") in PAGE_TIPS:
+            return "explain_page", e.path or ""
+    return None, ""
+
+
+def _template_suggestion(signal: str, path: str) -> dict | None:
+    """无 LLM / LLM 失败时的固定文案降级（与 AGENT_LLM_ENABLED=0 降级思路一致）。"""
+    if signal == "explain_page":
+        title, msg = PAGE_TIPS.get(path, ("提示", "需要我帮你看看这个页面吗？"))
+        return {"title": title, "message": msg, "action": {"type": "none"}, "confidence": 0.6}
+    base = {
+        "error": {"title": "出错了？", "message": "刚才那步好像出错了，要我帮你排查或换个条件再试吗？",
+                  "action": {"type": "prefill", "text": "帮我看看刚才为什么出错"}},
+        "empty_result": {"title": "没有匹配结果", "message": "条件可能太严了。用一句话描述你想圈的人群，我帮你生成分群并预估规模。",
+                         "action": {"type": "prefill", "text": "帮我建一个分群："}},
+        "stuck_creating": {"title": "需要帮忙建分群？", "message": "直接告诉我你想圈的人群，我来生成 DSL 并预估规模。",
+                           "action": {"type": "prefill", "text": "帮我建一个分群："}},
+        "stuck_analyst": {"title": "需要帮忙做图？", "message": "描述你想看的指标，我直接帮你建图表或看板。",
+                          "action": {"type": "prefill", "text": "帮我做一个图表："}},
+        "repeat": {"title": "在找什么功能？", "message": "告诉我你想做什么，我带你过去或直接帮你完成。",
+                   "action": {"type": "none"}},
+    }
+    s = base.get(signal)
+    if s:
+        s = {**s, "confidence": 0.6}
+    return s
+
+
+COPILOT_SYSTEM = (
+    "你是 AgenticDataHub CDP 控制台的「主动助手」。根据用户在控制台的最近行为和当前所在页面，"
+    "判断是否需要主动给用户一条具体、可执行的建议。不确定、或此刻打扰弊大于利时，保持沉默。"
+    "只输出 JSON，不要任何多余文字，格式："
+    "{\"should_suggest\":true/false,\"title\":\"<=12字\",\"message\":\"<=60字，具体可执行\","
+    "\"action\":{\"type\":\"open_page|prefill|none\",\"path\":\"open_page时的页面路由\",\"text\":\"prefill时预填给聊天框的话\"},"
+    "\"confidence\":0~1}。open_page 的 path 必须取自给定页面表，勿编造。"
+    "语气像贴心的同事，简短友好，不要营销腔。"
+)
+
+
+async def _copilot_suggest(req: ObserveRequest, signal: str, path: str) -> dict | None:
+    tmpl = _template_suggestion(signal, path)
+    if not DEEPSEEK_API_KEY:
+        return tmpl
+    page_name = (req.page or {}).get("name") or PAGE_INDEX.get(path, path)
+    ev_lines = "; ".join(
+        f"{e.type}@{e.path or path}" + (f"({_summarize(e.payload, 80)})" if e.payload else "")
+        for e in req.events[-12:])
+    pages = "\n".join(f"- {p} — {label}" for p, label in PAGE_CATALOG)
+    user = (f"当前页面：{path}（{page_name}）。\n命中信号：{signal}。\n最近行为：{ev_lines}\n"
+            f"参考建议（可改写或否决）：{(tmpl or {}).get('message', '')}\n可用页面路由：\n{pages}\n"
+            "如果此刻不该打扰用户，should_suggest 设为 false。")
+    try:
+        msg = await _deepseek_chat([{"role": "system", "content": COPILOT_SYSTEM},
+                                    {"role": "user", "content": user}])
+        content = (msg.get("content") or "").strip()
+        content = re.sub(r"^```(?:json)?|```$", "", content).strip()
+        data = json.loads(content)
+        if not data.get("should_suggest"):
+            return None
+        act = data.get("action") or {"type": "none"}
+        if act.get("type") == "open_page" and act.get("path") not in PAGE_INDEX:
+            act = {"type": "none"}
+        return {"title": data.get("title") or (tmpl or {}).get("title") or "建议",
+                "message": data.get("message") or (tmpl or {}).get("message") or "",
+                "action": act, "confidence": float(data.get("confidence") or 0.6)}
+    except Exception:  # noqa: BLE001
+        return tmpl
+
+
+@app.post("/observe")
+async def observe(req: ObserveRequest) -> dict:
+    """接收一批浏览器行为：落库 + 启发式门控 + copilot 判断。返回 {suggestion: {...}|null}。"""
+    if not PROACTIVE_ENABLED:
+        return {"suggestion": None}
+    _save_behavior(req)
+    signal, path = _detect_signal(req)
+    if not signal:
+        return {"suggestion": None}
+    now = time.time()
+    if now - _SUGGEST_COOLDOWN.get(req.session_id, 0.0) < PROACTIVE_COOLDOWN_SEC:
+        return {"suggestion": None}  # 冷却期内不打扰，也不烧 token
+    try:
+        sug = await _copilot_suggest(req, signal, path)
+    except Exception:  # noqa: BLE001
+        sug = None
+    if not sug:
+        return {"suggestion": None}
+    _SUGGEST_COOLDOWN[req.session_id] = now
+    sug["signal"] = signal
+    _save_suggestion(req, signal, sug)
+    return {"suggestion": sug}

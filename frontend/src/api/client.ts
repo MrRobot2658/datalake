@@ -6,6 +6,7 @@ import type {
   Relation,
   SearchResult,
 } from "./types";
+import { tracker } from "../lib/tracker";
 
 // 开发态 baseURL 走 vite 代理 /api → sql-engine；生产同源由 nginx 转发。
 export const http = axios.create({ baseURL: "/api", timeout: 45000 });
@@ -19,6 +20,22 @@ http.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// 主动式埋点：API 报错（4xx/5xx）记一条 error 行为，供 Copilot 主动提示。401 不记（登录态问题）。
+http.interceptors.response.use(
+  (r) => r,
+  (error) => {
+    try {
+      const status = error?.response?.status;
+      if (status && status !== 401) {
+        tracker.track("error", { status, endpoint: error?.config?.url });
+      }
+    } catch {
+      /* ignore */
+    }
+    return Promise.reject(error);
+  },
+);
 
 export async function getMetadata(tenant: number): Promise<Metadata> {
   const { data } = await http.get(`/metadata/${tenant}/fields`);

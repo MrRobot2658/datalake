@@ -4,6 +4,7 @@ import { useTenant } from "../../context/TenantContext";
 import { getMetadata, searchObjects, estimate, draftSegment, confirmSegment } from "../../api/client";
 import type { DslRule, Metadata, Relation } from "../../api/types";
 import { OBJECTS, byKey } from "../../lib/objects";
+import { tracker } from "../../lib/tracker";
 import { Card, Button, Badge, Spinner, DataTable, Modal, TextField } from "../ui";
 import ConditionEditor, { type FieldOption } from "./ConditionEditor";
 import RelationEditor from "./RelationEditor";
@@ -81,6 +82,7 @@ export default function UnifiedFilter({ baseObject, lockBase, autoSearch, rowLin
     try {
       const r = await estimate(tenant, rule);
       setEst({ n: r.estimate, ms: r.elapsed_ms, sql: r.sql });
+      if (r.estimate === 0) tracker.track("empty_state", { object: rule.object, source: "estimate" });
     } catch (e: any) {
       setErr(detail(e));
     } finally { setBusy(null); }
@@ -91,6 +93,7 @@ export default function UnifiedFilter({ baseObject, lockBase, autoSearch, rowLin
     try {
       const r = await searchObjects({ tenant_id: tenant, object: rule.object, conditions: rule.conditions, relations: rule.relations, logic: rule.logic, limit: 50 });
       setRows(r.data || []);
+      if (!(r.data || []).length) tracker.track("empty_state", { object: rule.object, source: "search" });
       if (r.sql) setEst((e) => (e ? { ...e, sql: r.sql } : { n: r.row_count || 0, ms: r.elapsed_ms, sql: r.sql }));
     } catch (e: any) {
       setErr(detail(e));

@@ -100,3 +100,37 @@ export async function getMcpTools(): Promise<McpToolsResponse> {
   const { data } = await assistantHttp.get("/mcp/tools");
   return data;
 }
+
+// ── 主动式埋点 Copilot ────────────────────────────────────────────────────────
+export interface BehaviorEvent {
+  type: "page_view" | "click" | "search" | "empty_state" | "error" | "idle" | "repeat";
+  path?: string;
+  name?: string;
+  ts?: number;
+  payload?: Record<string, any>;
+}
+
+export interface SuggestionAction {
+  type: "open_page" | "prefill" | "none";
+  path?: string;
+  text?: string;
+}
+
+export interface ProactiveSuggestion {
+  title: string;
+  message: string;
+  action?: SuggestionAction;
+  confidence?: number;
+  signal?: string;
+}
+
+export async function observeBehavior(body: {
+  tenant_id: number;
+  user_id?: number;
+  session_id: string;
+  page?: { path: string; name?: string };
+  events: BehaviorEvent[];
+}): Promise<{ suggestion: ProactiveSuggestion | null }> {
+  const { data } = await assistantHttp.post("/observe", body);
+  return data;
+}
