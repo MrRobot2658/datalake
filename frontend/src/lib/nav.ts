@@ -19,7 +19,7 @@ export interface NavSection {
   label: string; term: string; to: string; icon: LucideIcon; children?: NavChild[];
 }
 
-export const HOME: NavChild = { label: "概览", term: "Overview", to: "/", icon: LayoutGrid };
+export const HOME: NavChild = { label: "总览看板", term: "Overview", to: "/", icon: LayoutGrid };
 
 // 主分区
 export const SECTIONS: NavSection[] = [

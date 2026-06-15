@@ -26,13 +26,13 @@
 ### 2.2 信息架构与页面
 
 - 顶层分区（`lib/nav.ts` 的 `SECTIONS`）：连接 / 统一 / 对象 / 客户 / 触达 / 协议 / 隐私 / 监控；底部 `FOOTER_SECTION`：设置。
-- 单页：概览 Overview（`/`，`pages/Dashboard.tsx`，真实计数）。
+- 单页：**总览看板** Overview（`/`，`pages/Dashboard.tsx`）—— 核心 KPI 卡 + 关键分布图表（可下钻）+ 快捷入口；复用「分析」的 `getKpis` 与 `AnalystChart`（真实数据）。
 - 租户管理（§2.5）落在 **设置 → 租户管理**（`/settings/tenants`），属平台级治理，详见 [09-settings](./09-settings.md)。
 - 骨架：`components/layout/{Layout,Sidebar,Header}.tsx`。
 
 ### 2.3 关键用户流程
 
-1. 进入 → 默认概览，看各对象实时计数 → 点卡片进入对应模块。
+1. 进入 → 默认总览看板，看核心 KPI 与关键分布（点图表下钻明细）→ 快捷入口进入对应模块。
 2. 顶栏切 Workspace（租户）→ 全站数据随 `tenant_id` 刷新。
 3. 左栏点分区 → 展开二级 → 进入功能页。
 
