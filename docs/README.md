@@ -1,6 +1,6 @@
 # 模块产品文档（分模块开发）
 
-按 Twilio Segment 的信息架构，把 CDP 拆成 **1 个平台底座 + 9 个业务模块**。每个模块一份文档，含 **详细设计（产品）/ 技术设计 / TODOs**，可被独立认领、并行开发。
+按 Twilio Segment 的信息架构，把 CDP 拆成 **1 个平台底座 + 9 个业务模块**，并在其上扩展 **3 个 AgenticDataHub 一级菜单（知识库 / 应用 / 分析）**。每个模块一份文档，含 **详细设计（产品）/ 技术设计 / TODOs**，可被独立认领、并行开发。文档已**直接放在 `docs/` 下**（不再分 `modules/` 子目录）。
 
 ## 模块清单
 
@@ -16,8 +16,12 @@
 | 07 | 隐私 Privacy | Privacy | 全 Mock | [07-privacy.md](./07-privacy.md) |
 | 08 | 监控 Monitor | Monitor | 全 Mock | [08-monitor.md](./08-monitor.md) |
 | 09 | 设置 Settings | Settings / IAM | 全 Mock | [09-settings.md](./09-settings.md) |
+| 10 | 知识库 Knowledge | —（AgenticDataHub 扩展） | 真实 | [10-knowledge.md](./10-knowledge.md) |
+| 11 | 应用 Apps | —（应用市场） | 连接状态真实 | [11-apps.md](./11-apps.md) |
+| 12 | 分析 Analyst | —（看板 + NL 生成） | 真实 | [12-analyst.md](./12-analyst.md) |
 
-> 整理后跨模块技术文档已并入对应模块：**实时链路架构设计 + 规模扩展对照** 见 [00-platform](./00-platform.md)；**ID-Mapping 画像水平伸缩方案 + MCP 调用链路** 见 [02-unify](./02-unify.md)。
+> 跨模块技术文档已并入对应模块：**实时链路架构设计 + 规模扩展对照** 见 [00-platform](./00-platform.md)；**ID-Mapping 画像水平伸缩方案 + MCP 调用链路** 见 [02-unify](./02-unify.md)。
+> 全局能力（非独立一级菜单）：**智能助手**（右上角，DeepSeek + MCP，见 [00-platform](./00-platform.md)）· **登录门禁**（团队成员即账号，见 [09-settings](./09-settings.md)）。
 
 ## 文档模板（每个模块统一结构）
 

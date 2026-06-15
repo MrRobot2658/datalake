@@ -8,7 +8,7 @@
 
 **仓库**：https://github.com/MrRobot2658/agenticdatahub
 
-> 设计文档：[模块产品文档](./docs/modules/README.md)（1 平台底座 + 9 业务模块，各含 详细/技术设计 + TODOs）。整理后，跨模块技术文档已并入对应模块：**实时链路架构 / 规模扩展** → [00-platform](./docs/modules/00-platform.md)；**ID-Mapping 画像水平伸缩 / MCP 调用链路** → [02-unify](./docs/modules/02-unify.md)。· [OpenAPI](./swagger/) · [前端说明](./frontend/README.md)
+> 设计文档（均在 [`docs/`](./docs/README.md) 下，按一级目录分模块）：1 平台底座 + 9 业务模块 + 3 扩展菜单（[知识库](./docs/10-knowledge.md) / [应用](./docs/11-apps.md) / [分析](./docs/12-analyst.md)），各含 详细/技术设计 + TODOs。实时链路架构/规模 → [00-platform](./docs/00-platform.md)；ID-Mapping 画像伸缩 / MCP 调用链路 → [02-unify](./docs/02-unify.md)。· [OpenAPI](./swagger/) · [前端说明](./frontend/README.md)
 
 ---
 
