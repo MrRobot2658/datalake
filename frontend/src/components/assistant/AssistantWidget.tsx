@@ -7,6 +7,7 @@ import { useTenant } from "../../context/TenantContext";
 import { useAuth } from "../../context/AuthContext";
 import { useAssistant } from "../../context/AssistantContext";
 import { tracker } from "../../lib/tracker";
+import Markdown from "./Markdown";
 import {
   chatAssistant,
   listAssistantTasks,
@@ -236,7 +237,7 @@ export default function AssistantWidget() {
                   <Sparkles className="h-3 w-3" />
                   {m.suggestion?.title || tr("主动建议", "Suggestion")}
                 </div>
-                <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                <Markdown>{m.content}</Markdown>
                 {!m.suggestionDone && (
                   <div className="mt-2 flex flex-wrap gap-2">
                     {m.suggestion?.action && m.suggestion.action.type !== "none" && (
@@ -272,7 +273,11 @@ export default function AssistantWidget() {
                     {tr("智能体", "Agent")} · {m.agentName}
                   </div>
                 )}
-                <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                {m.role === "assistant" ? (
+                  <Markdown>{m.content}</Markdown>
+                ) : (
+                  <div className="whitespace-pre-wrap break-words">{m.content}</div>
+                )}
                 {m.created && (
                   <Link
                     to={m.created.path}
