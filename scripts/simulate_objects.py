@@ -11,12 +11,14 @@
 
 import argparse
 import json
+import os
 import urllib.request
 
 # 绕过本机可能存在的 http_proxy，避免 localhost 被代理（502）
 _OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
-BASE = "http://localhost:8002"
+# 可用 SIM_BASE 覆盖（如指向 Railway 上 sql-engine 的公网域名）
+BASE = os.getenv("SIM_BASE", "http://localhost:8002")
 TENANT = 1001
 CITIES = ["上海", "北京", "深圳", "杭州", "广州"]
 INDUSTRIES = ["manufacturing", "tech", "retail", "finance"]
