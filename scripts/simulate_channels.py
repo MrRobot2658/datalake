@@ -32,6 +32,11 @@ SCENARIOS = {
             "wework_extid": "wmKafkaExt001",
             "email": "kafka_user@brand-a.com",
             "device": "device_kafka_ios_001",
+            "web_visitor_id": "web_kafka_visitor_001",
+            "wechat_mp_openid": "mpo_kafka_001",
+            "wechat_channels_id": "ch_kafka_001",
+            "xiaohongshu_id": "xhs_kafka_001",
+            "douyin_id": "dy_kafka_001",
         },
         "steps": [
             ("Step1 微信小程序匿名访问", {
@@ -69,7 +74,42 @@ SCENARIOS = {
                 "link_keys": {"email": "email", "phone": "phone"},
                 "properties": {"app_version": "3.2.1", "order_count": 8, "amount": 15000},
             }),
-            ("Step6 冲突合并 (另一openid绑定同一手机)", {
+            ("Step6 公众号关注 (mp_openid+unionid)", {
+                "channel_type": "wechat_mp_openid",
+                "channel_key": "wechat_mp_openid",
+                "event_type": "subscribe_mp",
+                "link_keys": {"wechat_unionid": "wechat_unionid"},
+                "properties": {"mp_source": "扫码关注", "mp_scene": "线下海报", "interest": "新品发布"},
+            }),
+            ("Step7 视频号看直播 (channels+unionid)", {
+                "channel_type": "wechat_channels_id",
+                "channel_key": "wechat_channels_id",
+                "event_type": "watch_live",
+                "link_keys": {"wechat_unionid": "wechat_unionid"},
+                "properties": {"live_room": "618品牌直播间", "watch_seconds": 1830, "interest": "直播带货"},
+            }),
+            ("Step8 官网埋点浏览 (web+phone)", {
+                "channel_type": "web_visitor_id",
+                "channel_key": "web_visitor_id",
+                "event_type": "browse_official_site",
+                "link_keys": {"phone": "phone"},
+                "properties": {"page": "/products/flagship", "utm_source": "baidu", "stay_seconds": 95, "interest": "旗舰机型"},
+            }),
+            ("Step9 小红书种草点击 (xhs+phone)", {
+                "channel_type": "xiaohongshu_id",
+                "channel_key": "xiaohongshu_id",
+                "event_type": "content_engage",
+                "link_keys": {"phone": "phone"},
+                "properties": {"note_id": "xhs_note_8821", "action": "收藏+点赞", "campaign": "种草测评", "interest": "口碑内容"},
+            }),
+            ("Step10 抖音广告点击 (douyin+phone)", {
+                "channel_type": "douyin_id",
+                "channel_key": "douyin_id",
+                "event_type": "ad_click",
+                "link_keys": {"phone": "phone"},
+                "properties": {"ad_id": "dy_ad_5566", "campaign": "618大促", "action": "点击落地页", "order_count": 9, "amount": 18800},
+            }),
+            ("Step11 冲突合并 (另一openid绑定同一手机)", {
                 "channel_type": "wechat_openid",
                 "channel_id": "oXxx_kafka_user_002_conflict",
                 "event_type": "bind_phone",
@@ -86,35 +126,66 @@ SCENARIOS = {
             "phone": "13800003333",
             "email": "kafka_user@brand-b.com",
             "device": "device_kafka_android_002",
+            "wechat_mp_openid": "mpo_kafka_b001",
+            "xiaohongshu_id": "xhs_kafka_b001",
+            "douyin_id": "dy_kafka_b001",
         },
         "steps": [
-            ("Step1 H5页面访问 (openid)", {
+            ("Step1 抖音广告引流 (douyin匿名)", {
+                "channel_type": "douyin_id",
+                "channel_key": "douyin_id",
+                "event_type": "ad_click",
+                "link_keys": {},
+                "properties": {"ad_id": "dy_ad_b001", "campaign": "新客拉新", "interest": "入门款"},
+            }),
+            ("Step2 H5页面访问 (openid)", {
                 "channel_type": "wechat_openid",
                 "channel_key": "wechat_openid",
                 "event_type": "page_view",
                 "link_keys": {},
                 "properties": {"page": "product_list", "order_count": 0, "amount": 0},
             }),
-            ("Step2 手机号登录 (phone+openid)", {
+            ("Step3 手机号登录 (phone+openid)", {
                 "channel_type": "phone",
                 "channel_key": "phone",
                 "event_type": "login",
                 "link_keys": {"wechat_openid": "wechat_openid"},
                 "properties": {"login_method": "sms", "order_count": 1, "amount": 199},
             }),
-            ("Step3 邮箱订阅 (email+phone)", {
+            ("Step4 邮箱订阅 (email+phone)", {
                 "channel_type": "email",
                 "channel_key": "email",
                 "event_type": "subscribe",
                 "link_keys": {"phone": "phone"},
                 "properties": {"newsletter": True, "order_count": 2, "amount": 599},
             }),
-            ("Step4 App活跃 (device+email)", {
+            ("Step5 App活跃 (device+email)", {
                 "channel_type": "device",
                 "channel_key": "device",
                 "event_type": "app_launch",
                 "link_keys": {"email": "email"},
                 "properties": {"app_version": "2.1.0", "order_count": 4, "amount": 3200},
+            }),
+            ("Step6 小红书种草 (xhs+phone)", {
+                "channel_type": "xiaohongshu_id",
+                "channel_key": "xiaohongshu_id",
+                "event_type": "content_engage",
+                "link_keys": {"phone": "phone"},
+                "properties": {"note_id": "xhs_note_b556", "action": "点赞", "campaign": "口碑种草", "interest": "性价比"},
+            }),
+            ("Step7 公众号关注 (mp_openid+openid)", {
+                "channel_type": "wechat_mp_openid",
+                "channel_key": "wechat_mp_openid",
+                "event_type": "subscribe_mp",
+                "link_keys": {"phone": "phone"},
+                "properties": {"mp_source": "图文底部", "mp_scene": "活动推文", "interest": "优惠券"},
+            }),
+            ("Step8 抖音回流转化 (douyin+phone, 合并匿名首触)", {
+                "channel_type": "douyin_id",
+                "channel_key": "douyin_id",
+                "event_type": "ad_convert",
+                "link_keys": {"phone": "phone"},
+                "properties": {"ad_id": "dy_ad_b001", "action": "落地页留资", "order_count": 5, "amount": 4100},
             }),
         ],
     },

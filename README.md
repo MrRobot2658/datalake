@@ -1,10 +1,10 @@
-# AgenticDataHub · 智能实时数据底座
+# Data Agent · 多数据源计算存储智能代理
 
-**AgenticDataHub** 的产品定位是**智能实时数据底座**——一套以 AI Agent 为操作入口、可直接落地业务的实时数据基础设施。**多租户隔离、实时 ID-Mapping / OneID 归一、统一画像宽表、圈人激活、数据治理与隐私合规**都是构建在这个底座之上的**功能**。开箱即带一套**对标 [Twilio Segment](https://www.twilio.com/docs/segment) 的控制台**作为应用层（连接 → 用户 → 对象 → 客户 → 触达 → 协议 → 隐私 → 监控 → 知识库 → 应用 → 分析）。
+**Data Agent** 的产品定位是**多数据源计算存储智能代理——为 Agent 提供数据底座**。把散落在各处的数据（数据库/数仓/数据湖/对象存储/消息/API/文件）**统一接入、自动清洗、灵活转化、高性能计算**，以 AI Agent 为自然语言操作入口。向上对 Agent 暴露**结构化数据接口**（OneID 画像宽表 / 圈人结果 / 聚合指标），让上层 Agent 无需关心数据从哪来、怎么算——只管基于高质量的画像和标签做决策。支持**计算存储分离**（计算集群弹性扩缩，Doris 存算分离）也支持**一体化部署**（单机开箱即用），默认存储引擎为 **Apache Doris**。在此之上，多租户隔离、实时 ID-Mapping / OneID 归一、统一画像宽表、圈人激活、数据治理与隐私合规都是开箱功能。并带一套**对标 [Twilio Segment](https://www.twilio.com/docs/segment) 的控制台**作为应用层（连接 → 用户 → 对象 → 客户 → 触达 → 协议 → 隐私 → 监控 → 知识库 → 应用 → 分析）。
 
 > **本地全栈即跑、登录即用**：控制台带**强制登录门禁**（团队成员即登录账号，挂在 workspace 下）；右上角常驻**智能助手**（DeepSeek 对话 + 桥接 MCP 工具 + 后台任务）；可视化编排走**真实 Apache Airflow** 调度；数据源覆盖 **44 个主流连接器**（数据库/数仓/数据湖/对象存储/消息/查询引擎）；并内置**知识库（云盘式多模态存储）**、**应用市场**、**分析看板（NL 一句话生成图表/看板）**。
 
-> **名字含义**：**Agentic** —— DeepSeek 驱动的自然语言圈人/查询与 MCP 工具，让 LLM 安全地操作数据底座（候选 DSL 必须过校验层，绝不直出 SQL）；**DataHub** —— 把小程序/企微/表单/App/批量导入等多渠道数据，实时归一为 OneID 并打宽成统一画像的数据中枢。
+> **名字含义**：**Agent** —— DeepSeek 驱动的自然语言圈人/查询与 MCP 工具，让 LLM 安全地操作数据平台（候选 DSL 必须过校验层，绝不直出 SQL）；**DataHub** —— 多源数据接入的归一中枢，把小程序/企微/表单/App/批量导入等多渠道数据，实时归一为 OneID 并打宽成统一画像。
 
 **仓库**：https://github.com/MrRobot2658/agenticdatahub
 
@@ -50,8 +50,8 @@
 
 | 组件 | 端口 | 说明 |
 |------|------|------|
-| Nginx 网关 | 8080 | 首页 + AgenticDataHub 控制台 + API 路由代理 |
-| AgenticDataHub 控制台（前端） | 8080/console/ | 对标 Segment 的 React SPA（生产）；dev 用 5173 |
+| Nginx 网关 | 8080 | 首页 + Data Agent 控制台 + API 路由代理 |
+| Data Agent 控制台（前端） | 8080/console/ | 对标 Segment 的 React SPA（生产）；dev 用 5173 |
 | SQL Engine | 8002 | OLAP 查询层 + Agent（模板 SQL + DSL 圈人 + NL 圈人 + 只读 MCP，与 Doris 解耦） |
 | ID-Mapping | 8001 | 实时合并服务 API（OneID 识别 / merge） |
 | MySQL 8 | 3308 | 业务库：id_mapping / user_profile / user_groups / merge_log / object_* |
@@ -189,8 +189,8 @@ cd frontend && npm install && npm run dev   # → http://localhost:5173/
 
 | 用途 | 地址 |
 |------|------|
-| AgenticDataHub 控制台（开发态） | http://localhost:5173/ |
-| AgenticDataHub 控制台（生产/网关） | http://localhost:8080/console/ |
+| Data Agent 控制台（开发态） | http://localhost:5173/ |
+| Data Agent 控制台（生产/网关） | http://localhost:8080/console/ |
 | SQL Engine Swagger | http://localhost:8002/docs |
 | ID-Mapping Swagger | http://localhost:8001/docs |
 | Airflow UI | http://localhost:8088/ · 账号 `admin` / `admin` |

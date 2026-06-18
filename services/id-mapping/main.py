@@ -40,7 +40,15 @@ KAFKA_TOPICS = [t.strip() for t in os.getenv("KAFKA_TOPICS", "tenant-1001-events
 
 CHANNEL_TYPES = {
     "wechat_openid", "wechat_unionid", "wework_extid", "form_id", "phone", "email", "device",
+    # 全域渠道：官网埋点 / 公众号 / 视频号 / 小红书 / 抖音
+    "web_visitor_id", "wechat_mp_openid", "wechat_channels_id", "xiaohongshu_id", "douyin_id",
 }
+
+# 宽表 doris_user_wide 上落地为独立身份列的渠道（其余渠道仍进 id_mapping，但宽表不单列）
+WIDE_CHANNEL_COLUMNS = [
+    "wechat_openid", "wechat_unionid", "wework_extid", "form_id", "phone", "email", "device",
+    "web_visitor_id", "wechat_mp_openid", "wechat_channels_id", "xiaohongshu_id", "douyin_id",
+]
 
 
 class UserEvent(BaseModel):
@@ -268,21 +276,20 @@ class IdMappingService:
                 if isinstance(properties, str):
                     properties = json.loads(properties)
 
+                # 渠道身份列动态拼装：新增渠道只需扩 WIDE_CHANNEL_COLUMNS，SQL 自适应
+                channel_cols = ", ".join(WIDE_CHANNEL_COLUMNS)
+                channel_ph = ", ".join(["%s"] * len(WIDE_CHANNEL_COLUMNS))
+                channel_upd = ", ".join(f"{c}=VALUES({c})" for c in WIDE_CHANNEL_COLUMNS)
+                channel_vals = [channels.get(c) for c in WIDE_CHANNEL_COLUMNS]
                 cur.execute(
-                    """
+                    f"""
                     INSERT INTO doris_user_wide (
                         tenant_id, one_id,
-                        wechat_openid, wechat_unionid, wework_extid, form_id, phone, email, device,
+                        {channel_cols},
                         channel_count, tags, properties, last_event_time
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ) VALUES (%s, %s, {channel_ph}, %s, %s, %s, %s)
                     ON DUPLICATE KEY UPDATE
-                        wechat_openid=VALUES(wechat_openid),
-                        wechat_unionid=VALUES(wechat_unionid),
-                        wework_extid=VALUES(wework_extid),
-                        form_id=VALUES(form_id),
-                        phone=VALUES(phone),
-                        email=VALUES(email),
-                        device=VALUES(device),
+                        {channel_upd},
                         channel_count=VALUES(channel_count),
                         tags=VALUES(tags),
                         properties=VALUES(properties),
@@ -291,13 +298,7 @@ class IdMappingService:
                     """,
                     (
                         tenant_id, one_id,
-                        channels.get("wechat_openid"),
-                        channels.get("wechat_unionid"),
-                        channels.get("wework_extid"),
-                        channels.get("form_id"),
-                        channels.get("phone"),
-                        channels.get("email"),
-                        channels.get("device"),
+                        *channel_vals,
                         len(channels),
                         json.dumps(tags, ensure_ascii=False),
                         json.dumps(properties, ensure_ascii=False),

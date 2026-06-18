@@ -1,6 +1,8 @@
 # 模块产品文档（分模块开发）
 
-按 Twilio Segment 的信息架构，把 CDP 拆成 **1 个平台底座 + 9 个业务模块**，并在其上扩展 **3 个 AgenticDataHub 一级菜单（知识库 / 应用 / 分析）**。每个模块一份文档，含 **详细设计（产品）/ 技术设计 / TODOs**，可被独立认领、并行开发。文档已**直接放在 `docs/` 下**（不再分 `modules/` 子目录）。
+Data Agent 定位：**多数据源计算存储智能代理——为 Agent 提供数据底座**。统一接入多源数据、自动清洗、灵活转化、高性能计算，向上对 Agent 暴露结构化数据接口（OneID 画像 / 圈人 / 聚合指标）。支持**计算存储分离**（计算弹性扩缩 + Doris 存算分离）或**一体化部署**（单机开箱即用），默认存储引擎 **Apache Doris**。
+
+按 Twilio Segment 的信息架构，把平台拆成 **1 个平台底座 + 9 个业务模块**，并在其上扩展 **3 个 Data Agent 一级菜单（知识库 / 应用 / 分析）**。每个模块一份文档，含 **详细设计（产品）/ 技术设计 / TODOs**，可被独立认领、并行开发。文档已**直接放在 `docs/` 下**（不再分 `modules/` 子目录）。
 
 ## 模块清单
 
@@ -16,7 +18,7 @@
 | 07 | 隐私 Privacy | Privacy | 全 Mock | [07-privacy.md](./07-privacy.md) |
 | 08 | 监控 Monitor | Monitor | 全 Mock | [08-monitor.md](./08-monitor.md) |
 | 09 | 设置 Settings | Settings / IAM | 全 Mock | [09-settings.md](./09-settings.md) |
-| 10 | 知识库 Knowledge | —（AgenticDataHub 扩展） | 真实 | [10-knowledge.md](./10-knowledge.md) |
+| 10 | 知识库 Knowledge | —（Data Agent 扩展） | 真实 | [10-knowledge.md](./10-knowledge.md) |
 | 11 | 应用 Apps | —（应用市场） | 连接状态真实 | [11-apps.md](./11-apps.md) |
 | 12 | 分析 Analyst | —（看板 + NL 生成） | 真实 | [12-analyst.md](./12-analyst.md) |
 

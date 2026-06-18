@@ -113,6 +113,31 @@ def scheduler_pause(paused: bool = True):
     return _client.set_paused(AIRFLOW_DAG_ID, paused)
 
 
+@router.get("/scheduler/runs")
+def scheduler_runs(limit: int = 20):
+    """全局 Airflow 任务状态：最近 N 次 DAG 运行（不限管道），供右侧任务状态面板。"""
+    out: dict = {"engine": "airflow", "reachable": True, "ui_url": AIRFLOW_UI, "dag_id": AIRFLOW_DAG_ID, "runs": []}
+    try:
+        runs = []
+        for run in _client.last_runs(AIRFLOW_DAG_ID, limit):
+            rid = run.get("dag_run_id", "")
+            tenant_id = pipeline_id = None
+            parts = rid.split("__")
+            if len(parts) >= 4 and parts[0] == "adh":
+                tenant_id, pipeline_id = parts[1], parts[2]
+            runs.append({
+                "dag_run_id": rid, "state": run.get("state"),
+                "start_date": run.get("start_date"), "end_date": run.get("end_date"),
+                "logical_date": run.get("logical_date") or run.get("execution_date"),
+                "run_type": run.get("run_type"),
+                "tenant_id": tenant_id, "pipeline_id": pipeline_id,
+            })
+        out["runs"] = runs
+    except Exception as e:  # noqa: BLE001
+        out.update({"reachable": False, "error": str(e)})
+    return out
+
+
 @router.get("/pipelines/{pipeline_id}/runs")
 def pipeline_runs(pipeline_id: str, limit: int = 20):
     """某管道在 Airflow 上的执行历史（按 dag_run_id 编码的 pipeline_id 过滤）。"""

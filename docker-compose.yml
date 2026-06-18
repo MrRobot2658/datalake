@@ -134,7 +134,7 @@ services:
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./docker/nginx/html:/usr/share/nginx/html:ro
-      # AgenticDataHub 控制台：由 frontend 服务生产构建产出，写入 frontend_dist 卷，nginx 托管于 /console/
+      # Data Agent 控制台：由 frontend 服务生产构建产出，写入 frontend_dist 卷，nginx 托管于 /console/
       - frontend_dist:/usr/share/nginx/console:ro
     networks:
       - agenticdatahub-net

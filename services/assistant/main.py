@@ -36,7 +36,7 @@ SQL_ENGINE_URL = os.getenv("SQL_ENGINE_URL", "http://sql-engine:8000").rstrip("/
 MCP_SERVER_PATH = os.getenv("MCP_SERVER_PATH", "/app/mcp/server.py")
 MCP_SQL_ENGINE_URL = os.getenv("MCP_SQL_ENGINE_URL", SQL_ENGINE_URL)
 
-MAX_TOOL_ITERS = 5
+MAX_TOOL_ITERS = 6
 
 # 主动式埋点 Copilot 开关
 PROACTIVE_ENABLED = os.getenv("PROACTIVE_ENABLED", "1") not in ("0", "false", "False", "")
@@ -62,34 +62,73 @@ def _db():
     return pymysql.connect(**MYSQL_CFG, autocommit=True)
 
 
-def _save_messages(tenant_id: int, user_id: int | None, rows: list[tuple]) -> None:
+def _save_messages(tenant_id: int, user_id: int | None, conversation_id: str | None, rows: list[tuple]) -> None:
     """rows: [(role, content, agent), ...]。无 user_id 或出错时静默跳过。"""
     if not user_id or not rows:
         return
     try:
         with _db() as conn, conn.cursor() as cur:
             cur.executemany(
-                "INSERT INTO assistant_messages (tenant_id, user_id, role, content, agent) VALUES (%s,%s,%s,%s,%s)",
-                [(tenant_id, user_id, r, c, a) for (r, c, a) in rows],
+                "INSERT INTO assistant_messages (tenant_id, user_id, conversation_id, role, content, agent) "
+                "VALUES (%s,%s,%s,%s,%s,%s)",
+                [(tenant_id, user_id, conversation_id, r, c, a) for (r, c, a) in rows],
             )
     except Exception:  # noqa: BLE001
         pass
 
 
-def _load_history(tenant_id: int, user_id: int | None, limit: int = 50) -> list[dict]:
+def _load_history(tenant_id: int, user_id: int | None, conversation_id: str | None = None, limit: int = 50) -> list[dict]:
+    if not user_id:
+        return []
+    try:
+        with _db() as conn, conn.cursor() as cur:
+            if conversation_id:
+                cur.execute(
+                    "SELECT role, content, agent, created_at FROM assistant_messages "
+                    "WHERE tenant_id=%s AND user_id=%s AND conversation_id=%s ORDER BY id DESC LIMIT %s",
+                    (tenant_id, user_id, conversation_id, min(max(limit, 1), 200)),
+                )
+            else:
+                cur.execute(
+                    "SELECT role, content, agent, created_at FROM assistant_messages "
+                    "WHERE tenant_id=%s AND user_id=%s ORDER BY id DESC LIMIT %s",
+                    (tenant_id, user_id, min(max(limit, 1), 200)),
+                )
+            rows = cur.fetchall()[::-1]
+        for r in rows:
+            r["created_at"] = str(r.get("created_at")) if r.get("created_at") else None
+        return rows
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def _list_conversations(tenant_id: int, user_id: int | None, limit: int = 50) -> list[dict]:
+    """会话列表：按 conversation_id 聚合，标题取该会话最早的用户消息。"""
     if not user_id:
         return []
     try:
         with _db() as conn, conn.cursor() as cur:
             cur.execute(
-                "SELECT role, content, agent, created_at FROM assistant_messages "
-                "WHERE tenant_id=%s AND user_id=%s ORDER BY id DESC LIMIT %s",
-                (tenant_id, user_id, min(max(limit, 1), 200)),
+                "SELECT conversation_id, MAX(id) AS last_id, MAX(created_at) AS updated_at, COUNT(*) AS cnt "
+                "FROM assistant_messages WHERE tenant_id=%s AND user_id=%s AND conversation_id IS NOT NULL "
+                "GROUP BY conversation_id ORDER BY last_id DESC LIMIT %s",
+                (tenant_id, user_id, min(max(limit, 1), 100)),
             )
-            rows = cur.fetchall()[::-1]
-        for r in rows:
-            r["created_at"] = str(r.get("created_at")) if r.get("created_at") else None
-        return rows
+            convs = cur.fetchall()
+            out = []
+            for c in convs:
+                cid = c["conversation_id"]
+                cur.execute(
+                    "SELECT content FROM assistant_messages WHERE tenant_id=%s AND user_id=%s "
+                    "AND conversation_id=%s AND role='user' ORDER BY id ASC LIMIT 1",
+                    (tenant_id, user_id, cid),
+                )
+                first = cur.fetchone()
+                title = (first["content"][:30] if first and first.get("content") else "新会话")
+                out.append({"conversation_id": cid, "title": title,
+                            "updated_at": str(c.get("updated_at")) if c.get("updated_at") else None,
+                            "count": c.get("cnt")})
+        return out
     except Exception:  # noqa: BLE001
         return []
 
@@ -103,9 +142,13 @@ AGENT_DEFS: dict[str, dict] = {
 
 AGENT_SYSTEM: dict[str, str] = {
     "data": (
-        "你是 AgenticDataHub 的「数据查询」智能体；通过只读 MCP 工具查询「智能实时数据底座」"
-        "（用户/线索/客户/订单/受众/标签/画像等）。当前 tenant_id 是 {tenant_id}，调用需要 tenant_id 的工具时务必带上。"
-        "回答简洁，用用户的语言。"
+        "你是 AgenticDataHub 的「数据查询」智能体。**首选**用 show_profile / show_audience / show_table "
+        "把结果作为卡片直接呈现给用户——这些渲染工具会自行取数与预估，"
+        "**不要**先用 cdp_nl_segment / cdp_estimate / cdp_schema 反复试探。判断方式："
+        "看某个用户→show_profile(one_id)；圈人群/想知道某人群规模→show_audience(query)；"
+        "看某类对象的记录列表→show_table(object, query)。"
+        "只有当用户问的是必须用文字回答的具体事实（如精确计数、对比、解释字段含义）时，才用 cdp_* 只读工具查询后用文字作答。"
+        "当前 tenant_id 是 {tenant_id}，调用需要 tenant_id 的工具时务必带上。回答简洁，用用户的语言。"
     ),
     "analyst": (
         "你是 AgenticDataHub 的「分析」智能体。用户想要图表/看板/指标时：单个图表用 `create_chart`，"
@@ -149,6 +192,16 @@ NAV_SUFFIX = (
     "path 必须取自下表，勿编造：\n" + "\n".join(f"- {p} — {label}" for p, label in PAGE_CATALOG)
 ) if PAGE_CATALOG else ""
 
+# chat-native：本产品没有独立页面，所有结果都以卡片形式直接呈现在对话流里。
+SHOW_SUFFIX = (
+    "\n\n【对话即界面】本产品没有独立页面，所有结果都以卡片形式直接呈现在对话里。当用户想：\n"
+    "- 看某个用户的画像 → 调用 show_profile(one_id)\n"
+    "- 圈人群 / 估算人群规模 → 调用 show_audience(query)，query 用一句话描述目标人群\n"
+    "- 看某类对象的记录列表（用户/线索/客户/订单/商品/门店）→ 调用 show_table(object, query)\n"
+    "- 看图表/分布/趋势/占比 → 调用 show_chart(question)\n"
+    "调用渲染工具后，用一两句话点评结果，并可顺势追问下一步；需要精确数字或校验时才用 cdp_* 工具。"
+)
+
 OPEN_PAGE_TOOL = {"type": "function", "function": {
     "name": "open_page",
     "description": "在控制台打开/跳转到一个功能页面。path 必须是已知页面路由之一（见系统提示的页面表）。",
@@ -170,6 +223,8 @@ class ChatRequest(BaseModel):
     tenant_id: int
     messages: list[ChatMessage]
     user_id: int | None = None
+    conversation_id: str | None = None
+    mode: str = "agent"  # agent=可调用工具/渲染卡片；ask=只回答与解释，不执行操作
 
 
 # ── MCP 桥接 ────────────────────────────────────────────────────────────────
@@ -232,15 +287,45 @@ CREATE_DASHBOARD_TOOL = {"type": "function", "function": {
         "question": {"type": "string", "description": "对看板的中文描述，如：做一个电商运营看板，看订单和商品"},
     }, "required": ["question"]}}}
 
+# ── 渲染指令工具（chat-native）：调用后在对话里直接长出对应卡片，由前端取数渲染 ──────────
+SHOW_PROFILE_TOOL = {"type": "function", "function": {
+    "name": "show_profile",
+    "description": "在对话里渲染某个用户的「画像360」卡片（身份标识/渠道分布/行为时间线）。",
+    "parameters": {"type": "object", "properties": {
+        "one_id": {"type": "integer", "description": "用户 OneID，如 100002"},
+    }, "required": ["one_id"]}}}
+
+SHOW_AUDIENCE_TOOL = {"type": "function", "function": {
+    "name": "show_audience",
+    "description": "在对话里渲染「人群预估」卡片：把一句话目标人群翻译成 DSL、预估规模，并提供『保存为人群』按钮。",
+    "parameters": {"type": "object", "properties": {
+        "query": {"type": "string", "description": "用一句话描述目标人群，如：近30天在抖音点过广告且下过单的高价值用户"},
+    }, "required": ["query"]}}}
+
+SHOW_TABLE_TOOL = {"type": "function", "function": {
+    "name": "show_table",
+    "description": "在对话里渲染某类对象的「记录表格」卡片。query 可选，用一句话描述筛选条件。",
+    "parameters": {"type": "object", "properties": {
+        "object": {"type": "string", "description": "对象类型",
+                   "enum": ["user", "lead", "account", "product", "store", "order"]},
+        "query": {"type": "string", "description": "可选：一句话筛选条件，如『北京的线索』；留空则列出该对象记录"},
+    }, "required": ["object"]}}}
+
+SHOW_CHART_TOOL = {"type": "function", "function": {
+    "name": "show_chart",
+    "description": "在对话里渲染一张「图表」卡片（柱/线/饼/面），question 传对图表的中文描述。",
+    "parameters": {"type": "object", "properties": {
+        "question": {"type": "string", "description": "对图表的描述，如：按渠道看用户分布的柱状图"},
+    }, "required": ["question"]}}}
+
+SHOW_TOOLS = [SHOW_PROFILE_TOOL, SHOW_AUDIENCE_TOOL, SHOW_TABLE_TOOL, SHOW_CHART_TOOL]
+
 
 def _agent_tools(agent: str) -> list[dict]:
-    """非 data 智能体的工具集（均含 open_page 导航）。"""
-    tools: list[dict] = []
-    if agent == "analyst":
-        tools += [CREATE_CHART_TOOL, CREATE_DASHBOARD_TOOL]
-    elif agent == "task":
+    """非 data 智能体的工具集（chat-native：均含 show_* 渲染卡片工具）。"""
+    tools: list[dict] = list(SHOW_TOOLS)
+    if agent == "task":
         tools += [PUBLISH_TASK_TOOL]
-    tools.append(OPEN_PAGE_TOOL)
     return tools
 
 
@@ -261,6 +346,20 @@ def _local_exec(name: str, args: dict, tid: int):
         if path in PAGE_INDEX:
             return ({"opened": path, "name": PAGE_INDEX[path]}, {"navigate": {"path": path, "name": PAGE_INDEX[path]}})
         return {"error": f"未知页面：{path}（请从页面表里选）"}, {}
+    # 渲染指令工具：不取数，只回一条 view 指令，前端据此渲染内联卡片
+    if name == "show_profile":
+        oid = args.get("one_id")
+        return {"shown": "profile", "one_id": oid}, {"view": {"type": "profile", "one_id": oid}}
+    if name == "show_audience":
+        q = (args.get("query") or "").strip()
+        return {"shown": "audience", "query": q}, {"view": {"type": "audience", "query": q}}
+    if name == "show_table":
+        obj = (args.get("object") or "user").strip()
+        q = (args.get("query") or "").strip()
+        return {"shown": "table", "object": obj, "query": q}, {"view": {"type": "table", "object": obj, "query": q}}
+    if name == "show_chart":
+        q = (args.get("question") or "").strip()
+        return {"shown": "chart", "question": q}, {"view": {"type": "chart", "question": q}}
     return None, None
 
 
@@ -398,12 +497,13 @@ async def mcp_tools() -> dict:
     return {"server": server, "tools": tools}
 
 
-async def _agent_loop(messages: list[dict], tools: list[dict], execute) -> tuple[str, list, dict | None, dict | None, dict | None]:
-    """通用 tool-call 循环。execute(name, args) -> (result, meta{task?,created?,navigate?})。"""
+async def _agent_loop(messages: list[dict], tools: list[dict], execute) -> tuple[str, list, dict | None, dict | None, dict | None, list]:
+    """通用 tool-call 循环。execute(name, args) -> (result, meta{task?,created?,navigate?,view?})。"""
     steps: list[dict] = []
     task: dict | None = None
     created: dict | None = None
     navigate: dict | None = None
+    views: list[dict] = []  # chat-native：要渲染的内联卡片指令（按出现顺序）
     reply = ""
     for _ in range(MAX_TOOL_ITERS):
         message = await _deepseek_chat(messages, tools or None)
@@ -428,6 +528,8 @@ async def _agent_loop(messages: list[dict], tools: list[dict], execute) -> tuple
                     created = meta["created"]
                 if meta.get("navigate"):
                     navigate = meta["navigate"]
+                if meta.get("view"):
+                    views.append(meta["view"])
             except Exception as e:  # noqa: BLE001
                 ok = False
                 result, meta = {"error": str(e)}, {}
@@ -436,7 +538,7 @@ async def _agent_loop(messages: list[dict], tools: list[dict], execute) -> tuple
             steps.append({"tool": name, "args": args, "ok": ok, "summary": _summarize(result)})
     else:
         reply = reply or "（已达到工具调用上限，部分结果见 steps）"
-    return reply, steps, task, created, navigate
+    return reply, steps, task, created, navigate, views
 
 
 @app.post("/chat")
@@ -444,11 +546,26 @@ async def chat(req: ChatRequest) -> dict:
     if not DEEPSEEK_API_KEY:
         return {"reply": "（未配置 DeepSeek API Key，智能助手暂不可用）", "agent": "general",
                 "agent_name": AGENT_DEFS["general"]["name"], "steps": [], "task": None,
-                "created": None, "navigate": None}
+                "created": None, "navigate": None, "views": []}
+
+    tid = req.tenant_id
+    mode = (req.mode or "agent").lower()
+
+    # ask 模式：只回答/解释，不路由专职体、不调用任何工具、不渲染卡片。
+    if mode == "ask":
+        ask_sys = {"role": "system", "content": AGENT_SYSTEM["general"].format(tenant_id=tid)
+                   + "\n\n【提问模式】用户只想获得回答与解释，请直接、简洁作答，不要执行任何操作，也不要声称已渲染卡片或打开页面。"}
+        messages = [ask_sys] + [{"role": m.role, "content": m.content} for m in req.messages]
+        base = {"agent": "general", "agent_name": "提问"}
+        try:
+            reply = (await _deepseek_chat(messages)).get("content") or ""
+        except Exception as e:  # noqa: BLE001
+            reply = f"（智能助手处理出错：{e}）"
+        _persist_turn(req, reply, "ask")
+        return {**base, "reply": reply, "steps": [], "task": None, "created": None, "navigate": None, "views": []}
 
     agent = await _route(req.messages)
-    tid = req.tenant_id
-    sysmsg = {"role": "system", "content": AGENT_SYSTEM[agent].format(tenant_id=tid) + NAV_SUFFIX}
+    sysmsg = {"role": "system", "content": AGENT_SYSTEM[agent].format(tenant_id=tid) + SHOW_SUFFIX}
     messages: list[dict] = [sysmsg] + [{"role": m.role, "content": m.content} for m in req.messages]
     base = {"agent": agent, "agent_name": AGENT_DEFS[agent]["name"]}
 
@@ -461,7 +578,7 @@ async def chat(req: ChatRequest) -> dict:
                     global _TOOL_SCHEMA_CACHE
                     _TOOL_SCHEMA_CACHE = [_mcp_tool_to_function(t) for t in mcp_list]
                     names = {t.name for t in mcp_list}
-                    tools = _TOOL_SCHEMA_CACHE + [OPEN_PAGE_TOOL]  # data 也可导航
+                    tools = _TOOL_SCHEMA_CACHE + SHOW_TOOLS  # data 也可渲染内联卡片
 
                     async def execute(name, args):
                         res, meta = _local_exec(name, args, tid)
@@ -471,7 +588,7 @@ async def chat(req: ChatRequest) -> dict:
                             return _extract_mcp_result(await session.call_tool(name, args)), {}
                         return {"error": f"未知工具：{name}"}, {}
 
-                    reply, steps, task, created, navigate = await _agent_loop(messages, tools, execute)
+                    reply, steps, task, created, navigate, views = await _agent_loop(messages, tools, execute)
         else:
             async def execute(name, args):
                 res, meta = _local_exec(name, args, tid)
@@ -479,36 +596,47 @@ async def chat(req: ChatRequest) -> dict:
                     return res, meta
                 return {"error": f"未知工具：{name}"}, {}
 
-            reply, steps, task, created, navigate = await _agent_loop(messages, _agent_tools(agent), execute)
+            reply, steps, task, created, navigate, views = await _agent_loop(messages, _agent_tools(agent), execute)
 
         _persist_turn(req, reply, agent)
-        return {**base, "reply": reply, "steps": steps, "task": task, "created": created, "navigate": navigate}
+        return {**base, "reply": reply, "steps": steps, "task": task, "created": created, "navigate": navigate, "views": views}
     except Exception as e:  # noqa: BLE001
         reply = f"（智能助手处理出错：{e}）"
         _persist_turn(req, reply, agent)
-        return {**base, "reply": reply, "steps": [], "task": None, "created": None, "navigate": None}
+        return {**base, "reply": reply, "steps": [], "task": None, "created": None, "navigate": None, "views": []}
 
 
 def _persist_turn(req: ChatRequest, reply: str, agent: str) -> None:
-    """保存本轮：最新用户消息 + 助手回复（按 user_id）。"""
+    """保存本轮：最新用户消息 + 助手回复（按 user_id + conversation_id）。"""
     last_user = next((m.content for m in reversed(req.messages) if m.role == "user"), "")
     rows = []
     if last_user:
         rows.append(("user", last_user, None))
     rows.append(("assistant", reply, agent))
-    _save_messages(req.tenant_id, req.user_id, rows)
+    _save_messages(req.tenant_id, req.user_id, req.conversation_id, rows)
+
+
+@app.get("/conversations")
+async def conversations(user_id: int, tenant_id: int, limit: int = 50) -> dict:
+    """会话列表（new chat / 会话保存）。"""
+    return {"conversations": _list_conversations(tenant_id, user_id, limit)}
 
 
 @app.get("/history")
-async def history(user_id: int, tenant_id: int, limit: int = 50) -> dict:
-    return {"messages": _load_history(tenant_id, user_id, limit)}
+async def history(user_id: int, tenant_id: int, conversation_id: str | None = None, limit: int = 50) -> dict:
+    return {"messages": _load_history(tenant_id, user_id, conversation_id, limit)}
 
 
 @app.delete("/history")
-async def clear_history(user_id: int, tenant_id: int) -> dict:
+async def clear_history(user_id: int, tenant_id: int, conversation_id: str | None = None) -> dict:
+    """删除会话：给 conversation_id 则只删该会话，否则清空该用户全部。"""
     try:
         with _db() as conn, conn.cursor() as cur:
-            cur.execute("DELETE FROM assistant_messages WHERE tenant_id=%s AND user_id=%s", (tenant_id, user_id))
+            if conversation_id:
+                cur.execute("DELETE FROM assistant_messages WHERE tenant_id=%s AND user_id=%s AND conversation_id=%s",
+                            (tenant_id, user_id, conversation_id))
+            else:
+                cur.execute("DELETE FROM assistant_messages WHERE tenant_id=%s AND user_id=%s", (tenant_id, user_id))
     except Exception:  # noqa: BLE001
         pass
     return {"ok": True}

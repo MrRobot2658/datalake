@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS tenants (
 -- ID 映射冷层（对应文档 Doris id_mapping 表）
 CREATE TABLE IF NOT EXISTS id_mapping (
     tenant_id       BIGINT NOT NULL,
-    channel_type    VARCHAR(32) NOT NULL COMMENT 'wechat_openid/wechat_unionid/wework_extid/form_id/phone/email/device',
+    channel_type    VARCHAR(32) NOT NULL COMMENT 'wechat_openid/wechat_unionid/wework_extid/form_id/phone/email/device/web_visitor_id/wechat_mp_openid/wechat_channels_id/xiaohongshu_id/douyin_id',
     channel_id      VARCHAR(256) NOT NULL,
     one_id          BIGINT NOT NULL,
     confidence      DOUBLE DEFAULT 1.0,
@@ -107,6 +107,11 @@ CREATE TABLE IF NOT EXISTS doris_user_wide (
     phone               VARCHAR(256),
     email               VARCHAR(256),
     device              VARCHAR(256),
+    web_visitor_id      VARCHAR(256) COMMENT '官网埋点访客ID（cookie/匿名ID）',
+    wechat_mp_openid    VARCHAR(256) COMMENT '微信公众号关注者 openid',
+    wechat_channels_id  VARCHAR(256) COMMENT '微信视频号用户ID',
+    xiaohongshu_id      VARCHAR(256) COMMENT '小红书用户ID',
+    douyin_id           VARCHAR(256) COMMENT '抖音用户ID（open_id/unionid）',
     channel_count       INT DEFAULT 0,
     tags                JSON,
     properties          JSON,

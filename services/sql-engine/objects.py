@@ -19,8 +19,13 @@ MAX_HOPS = 3  # 文档 H2：实时 JOIN 最大 ≤ 3 跳，超跳拒绝
 OBJECT_REGISTRY: dict[str, dict] = {
     "user": {
         "table": "doris_user_wide", "id": "one_id", "id_numeric": True,
-        "fields": {"one_id": "int", "phone": "str", "tags": "json_array",
-                   "channel_count": "int", "properties": "json"},
+        "fields": {"one_id": "int", "phone": "str", "email": "str",
+                   "wechat_openid": "str", "wechat_unionid": "str", "wework_extid": "str",
+                   "form_id": "str", "device": "str",
+                   # 全域渠道身份：官网埋点 / 公众号 / 视频号 / 小红书 / 抖音
+                   "web_visitor_id": "str", "wechat_mp_openid": "str",
+                   "wechat_channels_id": "str", "xiaohongshu_id": "str", "douyin_id": "str",
+                   "tags": "json_array", "channel_count": "int", "properties": "json"},
     },
     "lead": {
         "table": "object_lead", "id": "lead_id", "id_numeric": False,
