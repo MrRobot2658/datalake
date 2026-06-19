@@ -359,7 +359,6 @@ export default function ChatApp() {
                 {loading ? <Spinner /> : <Send className="h-4 w-4" />}
               </button>
             </div>
-            <div className="mt-1.5 text-center text-[11px] text-gray-300">{tr("结果以卡片形式直接呈现在对话里 · Enter 发送 / Shift+Enter 换行", "Results render inline as cards · Enter to send / Shift+Enter for newline")}</div>
           </div>
         </div>
       </main>
