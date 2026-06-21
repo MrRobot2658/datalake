@@ -1,0 +1,4 @@
+# 由 nginx 镜像的 envsubst 入口在启动时渲染为 /etc/nginx/conf.d/cdp_apikey.conf。
+# 给所有经网关转发到后端的请求注入 CDP API Key 头，使浏览器流量也能通过 sql-engine 的鉴权。
+# CDP_API_KEY 为空时注入空值头，等同于不鉴权（sql-engine 仅在 key 非空时校验）。
+proxy_set_header X-API-Key "${CDP_API_KEY}";

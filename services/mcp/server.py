@@ -22,8 +22,12 @@ from mcp.server.fastmcp import FastMCP
 BASE = os.getenv("SQL_ENGINE_URL", "http://localhost:8002").rstrip("/")
 DEFAULT_TENANT = int(os.getenv("CDP_TENANT_ID", "1001"))
 
+# API Key 鉴权：sql-engine 配置了 CDP_API_KEY 时，每次请求须带 X-API-Key；未配置则留空、不影响。
+_API_KEY = os.getenv("CDP_API_KEY", "").strip()
+_HEADERS = {"X-API-Key": _API_KEY} if _API_KEY else {}
+
 # trust_env=False：绕过本机 http_proxy，避免 localhost 被代理（502）
-_client = httpx.Client(timeout=45.0, trust_env=False)
+_client = httpx.Client(timeout=45.0, trust_env=False, headers=_HEADERS)
 
 mcp = FastMCP("cdp")
 

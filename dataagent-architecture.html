@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataAgent 企业级智能体 · 系统架构图</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #f8fafc;
+    font-family: 'JetBrains Mono', monospace;
+    color: #0f172a;
+    padding: 24px;
+  }
+  .header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 20px;
+  }
+  .pulse-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #22d3ee;
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34,211,238,0.4); }
+    50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(34,211,238,0); }
+  }
+  h1 { font-size: 20px; font-weight: 700; color: #0f172a; }
+  .subtitle { font-size: 12px; color: #64748b; margin-top: 2px; }
+  .diagram-card {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+  .cards-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 20px;
+  }
+  .info-card {
+    background: #ffffff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .info-card h3 {
+    font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .card-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .card-dot.cyan { background: #22d3ee; }
+  .card-dot.green { background: #34d399; }
+  .card-dot.violet { background: #a78bfa; }
+  .info-card ul { list-style: none; }
+  .info-card li { font-size: 11px; color: #475569; line-height: 1.8; }
+  .footer {
+    margin-top: 16px; font-size: 10px; color: #94a3b8;
+    display: flex; justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="pulse-dot"></div>
+  <div>
+    <h1>DataAgent · 企业级智能体系统架构</h1>
+    <div class="subtitle">CDP + Multi-Agent Platform — 实时 & 离线双引擎 · 语义驱动 · Agent 自治</div>
+  </div>
+</div>
+
+<div class="diagram-card">
+<svg viewBox="0 0 1200 1020" xmlns="http://www.w3.org/2000/svg" font-family="'JetBrains Mono', monospace">
+
+  <!-- ==================== ARROWS (drawn first, behind components) ==================== -->
+  <defs>
+    <marker id="arrow-gray" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#94a3b8" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-cyan" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#22d3ee" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#34d399" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-violet" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#a78bfa" stroke-width="1.2"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="none" stroke="#fb923c" stroke-width="1.2"/>
+    </marker>
+  </defs>
+
+  <!-- Vertical flow arrows between tiers -->
+  <!-- App → Agent -->
+  <line x1="600" y1="128" x2="600" y2="158" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+  <!-- Agent → Semantic -->
+  <line x1="600" y1="238" x2="600" y2="268" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+  <!-- Semantic → Kafka Bus -->
+  <line x1="600" y1="348" x2="600" y2="378" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+  <!-- Kafka → Storage -->
+  <line x1="600" y1="418" x2="600" y2="448" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+  <!-- Storage → Processing -->
+  <line x1="600" y1="518" x2="600" y2="548" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+  <!-- Processing → Ingestion -->
+  <line x1="600" y1="658" x2="600" y2="688" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+  <!-- Ingestion → Sources -->
+  <line x1="600" y1="758" x2="600" y2="788" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+
+  <!-- Realtime path (left) -->
+  <path d="M300,418 L300,440 L300,555" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-cyan)"/>
+  <!-- Batch path (right) -->
+  <path d="M900,418 L900,440 L900,555" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrow-orange)"/>
+
+  <!-- Kafka bidirectional to Semantic -->
+  <line x1="350" y1="395" x2="350" y2="350" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow-cyan)"/>
+  <line x1="850" y1="395" x2="850" y2="350" stroke="#22d3ee" stroke-width="1" stroke-dasharray="3,3" marker-end="url(#arrow-cyan)"/>
+
+  <!-- Reverse ETL arrows (App → Sources direct) -->
+  <path d="M1100,105 L1170,105 L1170,820 L1100,820" fill="none" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="6,3" marker-end="url(#arrow-violet)"/>
+  <text x="1178" y="470" font-size="8" fill="#a78bfa" transform="rotate(90,1178,470)">Reverse ETL</text>
+
+
+  <!-- ==================== TIER 1: 应用层 ==================== -->
+  <rect x="40" y="55" width="1120" height="75" rx="10" fill="#ecfeff" stroke="#22d3ee" stroke-width="1" opacity="0.6"/>
+  <text x="58" y="74" font-size="10" fill="#0e7490" font-weight="600">应用层 APPLICATION</text>
+
+  <!-- Dashboard -->
+  <rect x="70" y="82" width="150" height="36" rx="6" fill="#ffffff" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="145" y="100" text-anchor="middle" font-size="10" fill="#0e7490" font-weight="500">📊 数据仪表盘</text>
+  <text x="145" y="112" text-anchor="middle" font-size="7" fill="#64748b">Dashboard · BI · Reports</text>
+
+  <!-- AI Copilot -->
+  <rect x="245" y="82" width="150" height="36" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="320" y="100" text-anchor="middle" font-size="10" fill="#166534" font-weight="500">🤖 AI Copilot</text>
+  <text x="320" y="112" text-anchor="middle" font-size="7" fill="#64748b">NL2SQL · 智能问答 · 洞察</text>
+
+  <!-- App Marketplace -->
+  <rect x="420" y="82" width="150" height="36" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="495" y="100" text-anchor="middle" font-size="10" fill="#5b21b6" font-weight="500">🏪 应用市场</text>
+  <text x="495" y="112" text-anchor="middle" font-size="7" fill="#64748b">Agent Marketplace · 模板</text>
+
+  <!-- MCP Server -->
+  <rect x="595" y="82" width="150" height="36" rx="6" fill="#ffffff" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="670" y="100" text-anchor="middle" font-size="10" fill="#0e7490" font-weight="500">🔌 MCP Server</text>
+  <text x="670" y="112" text-anchor="middle" font-size="7" fill="#64748b">REST · GraphQL · SDK</text>
+
+  <!-- Reverse ETL -->
+  <rect x="770" y="82" width="150" height="36" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="845" y="100" text-anchor="middle" font-size="10" fill="#5b21b6" font-weight="500">🔄 Reverse ETL</text>
+  <text x="845" y="112" text-anchor="middle" font-size="7" fill="#64748b">同步回 CRM/MA/广告</text>
+
+  <!-- Open API -->
+  <rect x="945" y="82" width="150" height="36" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="1020" y="100" text-anchor="middle" font-size="10" fill="#475569" font-weight="500">🌐 Open API</text>
+  <text x="1020" y="112" text-anchor="middle" font-size="7" fill="#64748b">Webhook · SDK · 第三方集成</text>
+
+
+  <!-- ==================== TIER 2: 智能体层 ==================== -->
+  <rect x="40" y="158" width="1120" height="80" rx="10" fill="#f0fdf4" stroke="#34d399" stroke-width="1" opacity="0.6"/>
+  <text x="58" y="177" font-size="10" fill="#166534" font-weight="600">智能体层 AGENT</text>
+
+  <!-- Multi-Agent -->
+  <rect x="70" y="185" width="175" height="40" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="157" y="205" text-anchor="middle" font-size="10" fill="#166534" font-weight="500">🧠 多 Agent 协作</text>
+  <text x="157" y="218" text-anchor="middle" font-size="7" fill="#64748b">Data · Insight · Action · Comms</text>
+
+  <!-- Action Registry -->
+  <rect x="270" y="185" width="175" height="40" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="357" y="205" text-anchor="middle" font-size="10" fill="#166534" font-weight="500">⚡ Action Registry</text>
+  <text x="357" y="218" text-anchor="middle" font-size="7" fill="#64748b">50+ 原子动作 · 审批门控</text>
+
+  <!-- Workflow Engine -->
+  <rect x="470" y="185" width="175" height="40" rx="6" fill="#ffffff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="557" y="205" text-anchor="middle" font-size="10" fill="#9a3412" font-weight="500">🔧 Temporal 工作流</text>
+  <text x="557" y="218" text-anchor="middle" font-size="7" fill="#64748b">DAG 编排 · 重试 · 补偿</text>
+
+  <!-- Agent RBAC -->
+  <rect x="670" y="185" width="155" height="40" rx="6" fill="#ffffff" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="747" y="205" text-anchor="middle" font-size="10" fill="#9f1239" font-weight="500">🔒 Agent RBAC</text>
+  <text x="747" y="218" text-anchor="middle" font-size="7" fill="#64748b">权限 · PII 脱敏 · 审计链</text>
+
+  <!-- Observability -->
+  <rect x="850" y="185" width="155" height="40" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="927" y="205" text-anchor="middle" font-size="10" fill="#475569" font-weight="500">📡 可观测性</text>
+  <text x="927" y="218" text-anchor="middle" font-size="7" fill="#64748b">Token · 幻觉率 · 异常检测</text>
+
+  <!-- Memory -->
+  <rect x="1030" y="185" width="110" height="40" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="1085" y="205" text-anchor="middle" font-size="10" fill="#475569" font-weight="500">💾 记忆</text>
+  <text x="1085" y="218" text-anchor="middle" font-size="7" fill="#64748b">长期 · 上下文</text>
+
+
+  <!-- ==================== TIER 3: 语义层 ==================== -->
+  <rect x="40" y="268" width="1120" height="80" rx="10" fill="#faf5ff" stroke="#a78bfa" stroke-width="1" opacity="0.6"/>
+  <text x="58" y="287" font-size="10" fill="#5b21b6" font-weight="600">语义层 SEMANTIC</text>
+
+  <!-- Ontology -->
+  <rect x="70" y="296" width="200" height="40" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="170" y="316" text-anchor="middle" font-size="10" fill="#5b21b6" font-weight="500">🏛 Ontology 本体引擎</text>
+  <text x="170" y="329" text-anchor="middle" font-size="7" fill="#64748b">对象注册 · 关系图谱 · 动态Schema</text>
+
+  <!-- UQL -->
+  <rect x="295" y="296" width="195" height="40" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="392" y="316" text-anchor="middle" font-size="10" fill="#5b21b6" font-weight="500">🔍 UQL 统一查询</text>
+  <text x="392" y="329" text-anchor="middle" font-size="7" fill="#64748b">跨系统 JOIN · NL→UQL · 安全沙箱</text>
+
+  <!-- Semantic Alias -->
+  <rect x="515" y="296" width="175" height="40" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="602" y="316" text-anchor="middle" font-size="10" fill="#5b21b6" font-weight="500">🔤 语义别名</text>
+  <text x="602" y="329" text-anchor="middle" font-size="7" fill="#64748b">Deal=商机=Opportunity</text>
+
+  <!-- Business Functions -->
+  <rect x="715" y="296" width="200" height="40" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="815" y="316" text-anchor="middle" font-size="10" fill="#5b21b6" font-weight="500">📈 业务语义函数库</text>
+  <text x="815" y="329" text-anchor="middle" font-size="7" fill="#64748b">churn_risk · ltv · margin · 50+ UDF</text>
+
+  <!-- Knowledge RAG -->
+  <rect x="940" y="296" width="200" height="40" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="1040" y="316" text-anchor="middle" font-size="10" fill="#5b21b6" font-weight="500">📚 Knowledge RAG</text>
+  <text x="1040" y="329" text-anchor="middle" font-size="7" fill="#64748b">向量检索 · 文档切片 · 行业知识库</text>
+
+
+  <!-- ==================== TIER 4: 事件总线 (Kafka) ==================== -->
+  <rect x="40" y="378" width="1120" height="40" rx="8" fill="#fff7ed" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="600" y="400" text-anchor="middle" font-size="12" fill="#9a3412" font-weight="700">⚡ Apache Kafka · 事件总线 + Schema Registry</text>
+  <text x="600" y="413" text-anchor="middle" font-size="8" fill="#64748b">CDC 事件流 · Agent 事件 · 语义事件 · 实时通知 · 跨系统解耦</text>
+
+
+  <!-- ==================== TIER 5: 数据存储层 ==================== -->
+  <rect x="40" y="448" width="1120" height="72" rx="10" fill="#fefce8" stroke="#fde047" stroke-width="1" opacity="0.5"/>
+  <text x="58" y="467" font-size="10" fill="#854d0e" font-weight="600">存储层 STORAGE</text>
+
+  <!-- PostgreSQL -->
+  <rect x="70" y="475" width="150" height="36" rx="6" fill="#ffffff" stroke="#a78bfa" stroke-width="1.5"/>
+  <text x="145" y="493" text-anchor="middle" font-size="9" fill="#5b21b6" font-weight="500">🐘 PostgreSQL</text>
+  <text x="145" y="505" text-anchor="middle" font-size="7" fill="#64748b">OLTP · JSONB · 元数据</text>
+
+  <!-- Apache Doris -->
+  <rect x="245" y="475" width="150" height="36" rx="6" fill="#ffffff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="320" y="493" text-anchor="middle" font-size="9" fill="#9a3412" font-weight="500">🔥 Apache Doris</text>
+  <text x="320" y="505" text-anchor="middle" font-size="7" fill="#64748b">OLAP · 宽表 · 实时分析</text>
+
+  <!-- Milvus -->
+  <rect x="420" y="475" width="140" height="36" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="490" y="493" text-anchor="middle" font-size="9" fill="#166534" font-weight="500">🧬 Milvus</text>
+  <text x="490" y="505" text-anchor="middle" font-size="7" fill="#64748b">向量 · Embedding</text>
+
+  <!-- Neo4j -->
+  <rect x="585" y="475" width="140" height="36" rx="6" fill="#ffffff" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="655" y="493" text-anchor="middle" font-size="9" fill="#0e7490" font-weight="500">🕸 Neo4j</text>
+  <text x="655" y="505" text-anchor="middle" font-size="7" fill="#64748b">图 · 关系遍历</text>
+
+  <!-- Redis -->
+  <rect x="750" y="475" width="130" height="36" rx="6" fill="#ffffff" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="815" y="493" text-anchor="middle" font-size="9" fill="#9f1239" font-weight="500">⚡ Redis</text>
+  <text x="815" y="505" text-anchor="middle" font-size="7" fill="#64748b">缓存 · 会话 · 限流</text>
+
+  <!-- MinIO -->
+  <rect x="905" y="475" width="130" height="36" rx="6" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="970" y="493" text-anchor="middle" font-size="9" fill="#475569" font-weight="500">📦 MinIO</text>
+  <text x="970" y="505" text-anchor="middle" font-size="7" fill="#64748b">对象存储 · 文件</text>
+
+  <!-- ClickHouse -->
+  <rect x="1060" y="475" width="85" height="36" rx="6" fill="#ffffff" stroke="#fde047" stroke-width="1.5"/>
+  <text x="1102" y="493" text-anchor="middle" font-size="9" fill="#854d0e" font-weight="500">📊 CK</text>
+  <text x="1102" y="505" text-anchor="middle" font-size="7" fill="#64748b">日志分析</text>
+
+
+  <!-- ==================== TIER 6: 数据处理层 ==================== -->
+  <rect x="40" y="550" width="1120" height="108" rx="10" fill="#fef2f2" stroke="#fca5a5" stroke-width="1" opacity="0.5"/>
+  <text x="58" y="569" font-size="10" fill="#991b1b" font-weight="600">处理层 PROCESSING</text>
+
+  <!-- Real-time sub-tier (left) -->
+  <rect x="60" y="578" width="530" height="68" rx="8" fill="#ecfeff" stroke="#22d3ee" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="78" y="594" font-size="9" fill="#0e7490" font-weight="600">⚡ 实时处理 REAL-TIME</text>
+
+  <rect x="80" y="602" width="155" height="34" rx="6" fill="#ffffff" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="157" y="619" text-anchor="middle" font-size="9" fill="#0e7490" font-weight="500">🌊 Flink 流处理</text>
+  <text x="157" y="631" text-anchor="middle" font-size="7" fill="#64748b">窗口聚合 · CEP · 实时ETL</text>
+
+  <rect x="255" y="602" width="145" height="34" rx="6" fill="#ffffff" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="327" y="619" text-anchor="middle" font-size="9" fill="#0e7490" font-weight="500">📡 实时 CDC</text>
+  <text x="327" y="631" text-anchor="middle" font-size="7" fill="#64748b">变更捕获 · 增量同步</text>
+
+  <rect x="420" y="602" width="150" height="34" rx="6" fill="#ffffff" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="495" y="619" text-anchor="middle" font-size="9" fill="#0e7490" font-weight="500">🔔 事件触发</text>
+  <text x="495" y="631" text-anchor="middle" font-size="7" fill="#64748b">CEP 规则 · 实时告警</text>
+
+  <!-- Batch sub-tier (right) -->
+  <rect x="610" y="578" width="530" height="68" rx="8" fill="#fff7ed" stroke="#fb923c" stroke-width="1.2" stroke-dasharray="4,3"/>
+  <text x="628" y="594" font-size="9" fill="#9a3412" font-weight="600">📦 离线处理 BATCH</text>
+
+  <rect x="630" y="602" width="155" height="34" rx="6" fill="#ffffff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="707" y="619" text-anchor="middle" font-size="9" fill="#9a3412" font-weight="500">🎯 Airflow 编排</text>
+  <text x="707" y="631" text-anchor="middle" font-size="7" fill="#64748b">DAG 调度 · 依赖管理</text>
+
+  <rect x="805" y="602" width="145" height="34" rx="6" fill="#ffffff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="877" y="619" text-anchor="middle" font-size="9" fill="#9a3412" font-weight="500">⚙️ Spark 批计算</text>
+  <text x="877" y="631" text-anchor="middle" font-size="7" fill="#64748b">大批量ETL · 数据清洗</text>
+
+  <rect x="970" y="602" width="150" height="34" rx="6" fill="#ffffff" stroke="#fb923c" stroke-width="1.5"/>
+  <text x="1045" y="619" text-anchor="middle" font-size="9" fill="#9a3412" font-weight="500">🔄 dbt 转换</text>
+  <text x="1045" y="631" text-anchor="middle" font-size="7" fill="#64748b">模型 · 血缘 · 数据质量</text>
+
+
+  <!-- ==================== TIER 7: 数据采集层 ==================== -->
+  <rect x="40" y="688" width="1120" height="70" rx="10" fill="#f0fdf4" stroke="#86efac" stroke-width="1" opacity="0.5"/>
+  <text x="58" y="707" font-size="10" fill="#166534" font-weight="600">采集层 INGESTION</text>
+
+  <rect x="70" y="716" width="175" height="32" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="157" y="733" text-anchor="middle" font-size="9" fill="#166534" font-weight="500">🔗 CDC Debezium</text>
+  <text x="157" y="744" text-anchor="middle" font-size="7" fill="#64748b">MySQL/PG Binlog → Kafka</text>
+
+  <rect x="270" y="716" width="175" height="32" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="357" y="733" text-anchor="middle" font-size="9" fill="#166534" font-weight="500">🌐 API Connector</text>
+  <text x="357" y="744" text-anchor="middle" font-size="7" fill="#64748b">REST · GraphQL · OAuth</text>
+
+  <rect x="470" y="716" width="165" height="32" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="552" y="733" text-anchor="middle" font-size="9" fill="#166534" font-weight="500">📁 File Import</text>
+  <text x="552" y="744" text-anchor="middle" font-size="7" fill="#64748b">CSV · Excel · Parquet</text>
+
+  <rect x="660" y="716" width="155" height="32" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="737" y="733" text-anchor="middle" font-size="9" fill="#166534" font-weight="500">🔔 Webhook</text>
+  <text x="737" y="744" text-anchor="middle" font-size="7" fill="#64748b">事件订阅 · 回调</text>
+
+  <rect x="840" y="716" width="155" height="32" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="917" y="733" text-anchor="middle" font-size="9" fill="#166534" font-weight="500">📡 IoT / MQTT</text>
+  <text x="917" y="744" text-anchor="middle" font-size="7" fill="#64748b">设备数据 · 传感器</text>
+
+  <rect x="1020" y="716" width="120" height="32" rx="6" fill="#ffffff" stroke="#34d399" stroke-width="1.5"/>
+  <text x="1080" y="733" text-anchor="middle" font-size="9" fill="#166534" font-weight="500">📋 Log</text>
+  <text x="1080" y="744" text-anchor="middle" font-size="7" fill="#64748b">Fluentd · 日志采集</text>
+
+
+  <!-- ==================== TIER 8: 数据源层 ==================== -->
+  <rect x="40" y="788" width="1120" height="80" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="58" y="807" font-size="10" fill="#475569" font-weight="600">数据源层 DATA SOURCES</text>
+
+  <!-- CRM -->
+  <rect x="70" y="816" width="130" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="135" y="836" text-anchor="middle" font-size="10" fill="#991b1b" font-weight="600">CRM</text>
+  <text x="135" y="849" text-anchor="middle" font-size="7" fill="#64748b">Twenty · Salesforce</text>
+
+  <!-- ERP -->
+  <rect x="225" y="816" width="130" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="290" y="836" text-anchor="middle" font-size="10" fill="#991b1b" font-weight="600">ERP</text>
+  <text x="290" y="849" text-anchor="middle" font-size="7" fill="#64748b">ERPNext · Odoo</text>
+
+  <!-- MA -->
+  <rect x="380" y="816" width="130" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="445" y="836" text-anchor="middle" font-size="10" fill="#991b1b" font-weight="600">MA 营销</text>
+  <text x="445" y="849" text-anchor="middle" font-size="7" fill="#64748b">Mautic · HubSpot</text>
+
+  <!-- Finance -->
+  <rect x="535" y="816" width="130" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="600" y="836" text-anchor="middle" font-size="10" fill="#991b1b" font-weight="600">财务系统</text>
+  <text x="600" y="849" text-anchor="middle" font-size="7" fill="#64748b">金蝶 · 用友 · SAP</text>
+
+  <!-- E-commerce -->
+  <rect x="690" y="816" width="130" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="755" y="836" text-anchor="middle" font-size="10" fill="#991b1b" font-weight="600">电商平台</text>
+  <text x="755" y="849" text-anchor="middle" font-size="7" fill="#64748b">Shopify · Amazon</text>
+
+  <!-- Social -->
+  <rect x="845" y="816" width="130" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="910" y="836" text-anchor="middle" font-size="10" fill="#991b1b" font-weight="600">社交/广告</text>
+  <text x="910" y="849" text-anchor="middle" font-size="7" fill="#64748b">微信 · Meta · TikTok</text>
+
+  <!-- External -->
+  <rect x="1000" y="816" width="130" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="1065" y="836" text-anchor="middle" font-size="10" fill="#991b1b" font-weight="600">外部数据</text>
+  <text x="1065" y="849" text-anchor="middle" font-size="7" fill="#64748b">征信 · 工商 · 舆情</text>
+
+
+  <!-- ==================== LEGEND ==================== -->
+  <rect x="40" y="890" width="1120" height="55" rx="8" fill="#ffffff" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="60" y="908" font-size="9" fill="#475569" font-weight="600">图例 LEGEND</text>
+
+  <rect x="60" y="916" width="12" height="12" rx="2" fill="#ecfeff" stroke="#22d3ee" stroke-width="1"/>
+  <text x="78" y="926" font-size="8" fill="#475569">应用/实时 (Cyan)</text>
+
+  <rect x="190" y="916" width="12" height="12" rx="2" fill="#f0fdf4" stroke="#34d399" stroke-width="1"/>
+  <text x="208" y="926" font-size="8" fill="#475569">智能体/采集 (Green)</text>
+
+  <rect x="340" y="916" width="12" height="12" rx="2" fill="#faf5ff" stroke="#a78bfa" stroke-width="1"/>
+  <text x="358" y="926" font-size="8" fill="#475569">语义/图存储 (Violet)</text>
+
+  <rect x="480" y="916" width="12" height="12" rx="2" fill="#fff7ed" stroke="#fb923c" stroke-width="1"/>
+  <text x="498" y="926" font-size="8" fill="#475569">事件总线/离线 (Orange)</text>
+
+  <rect x="640" y="916" width="12" height="12" rx="2" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="658" y="926" font-size="8" fill="#475569">数据源 (Red)</text>
+
+  <rect x="760" y="916" width="12" height="12" rx="2" fill="#fefce8" stroke="#fde047" stroke-width="1"/>
+  <text x="778" y="926" font-size="8" fill="#475569">存储 (Yellow)</text>
+
+  <line x1="890" y1="922" x2="930" y2="922" stroke="#94a3b8" stroke-width="1.2" marker-end="url(#arrow-gray)"/>
+  <text x="938" y="926" font-size="8" fill="#475569">数据流</text>
+
+  <line x1="1000" y1="922" x2="1040" y2="922" stroke="#a78bfa" stroke-width="1.2" stroke-dasharray="6,3" marker-end="url(#arrow-violet)"/>
+  <text x="1048" y="926" font-size="8" fill="#475569">Reverse ETL</text>
+
+  <!-- Version -->
+  <text x="600" y="965" text-anchor="middle" font-size="8" fill="#94a3b8">DataAgent v2.0 Architecture · 2026-06-20 · AgenticDataHub Platform</text>
+
+</svg>
+</div>
+
+<div class="cards-row">
+  <div class="info-card">
+    <h3><span class="card-dot cyan"></span>实时处理链路</h3>
+    <ul>
+      <li>• 数据源 CDC → Debezium → Kafka → Flink 流处理</li>
+      <li>• Flink 实时写入 Doris 宽表 + 触发 CEP 规则</li>
+      <li>• 语义事件 → Agent 实时响应（&lt;1s）</li>
+      <li>• 端到端延迟：数据变更到 Agent 感知 &lt;5s</li>
+    </ul>
+  </div>
+  <div class="info-card">
+    <h3><span class="card-dot green"></span>离线处理链路</h3>
+    <ul>
+      <li>• Airflow DAG 调度 T+1 批处理任务</li>
+      <li>• Spark 大批量 ETL + 数据清洗 + 特征工程</li>
+      <li>• dbt 模型转换 + 数据质量校验 + 血缘追踪</li>
+      <li>• 结果写入 Doris/PostgreSQL → 语义层消费</li>
+    </ul>
+  </div>
+  <div class="info-card">
+    <h3><span class="card-dot violet"></span>语义驱动架构</h3>
+    <ul>
+      <li>• 所有数据源 → 统一 Ontology 建模</li>
+      <li>• UQL 替代原生 SQL，跨系统查询一条搞定</li>
+      <li>• Agent 只感知语义层，不感知底层存储</li>
+      <li>• 系统边界消融：CRM/ERP 退化为连接器</li>
+    </ul>
+  </div>
+</div>
+
+<div class="footer">
+  <span>DataAgent · AgenticDataHub Platform</span>
+  <span>Generated 2026-06-20</span>
+</div>
+
+</body>
+</html>

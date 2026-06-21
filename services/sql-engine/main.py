@@ -8,6 +8,7 @@ import os
 import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
 
 from agent import NlSegmentAgent
 from dsl import DslEngine
@@ -99,6 +100,24 @@ app = FastAPI(
     openapi_url="/openapi.json",
     root_path=ROOT_PATH,
 )
+
+
+# ── API Key 鉴权（机器调用，如 MCP）─────────────────────────────────────────
+# 仅当配置了 CDP_API_KEY 时启用；启用后所有请求须带 X-API-Key 头，否则 401。
+# 浏览器经 nginx /api 访问时由网关注入该头；MCP 由 services/mcp/server.py 注入。
+# 健康检查 / Swagger 文档放行，便于探活与调试；未配置则完全放行（保持原行为）。
+_CDP_API_KEY = os.getenv("CDP_API_KEY", "").strip()
+_AUTH_EXEMPT = ("/health", "/docs", "/redoc", "/openapi.json")
+
+
+@app.middleware("http")
+async def _api_key_guard(request, call_next):
+    if _CDP_API_KEY and request.method != "OPTIONS":
+        path = request.url.path
+        if not any(path == p or path.startswith(p + "/") for p in _AUTH_EXEMPT):
+            if request.headers.get("x-api-key", "").strip() != _CDP_API_KEY:
+                return JSONResponse(status_code=401, content={"detail": "无效或缺失的 API Key"})
+    return await call_next(request)
 
 
 # ── 系统 ──────────────────────────────────────────────────────────────────

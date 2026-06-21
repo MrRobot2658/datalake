@@ -1,11 +1,12 @@
 {
   "mcpServers": {
     "cdp": {
-      "command": "/Users/lei26/Downloads/datalake/.venv/bin/python",
-      "args": ["/Users/lei26/Downloads/datalake/services/mcp/server.py"],
+      "command": "/Users/lei26/Downloads/DataAgent/.venv/bin/python",
+      "args": ["/Users/lei26/Downloads/DataAgent/services/mcp/server.py"],
       "env": {
         "SQL_ENGINE_URL": "http://localhost:8002",
-        "CDP_TENANT_ID": "1001"
+        "CDP_TENANT_ID": "1001",
+        "CDP_API_KEY": "cdp_sk_87f580b5a34de04594bf7b3e903bf1bc"
       }
     }
   }

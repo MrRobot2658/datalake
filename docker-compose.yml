@@ -131,8 +131,13 @@ services:
         condition: service_completed_successfully
     ports:
       - "8080:80"
+    environment:
+      # 网关向后端注入的 CDP API Key（envsubst 渲染 cdp_apikey.conf.template）。留空 = 不鉴权。
+      CDP_API_KEY: ${CDP_API_KEY:-}
     volumes:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # envsubst 入口在启动时把该模板渲染成 /etc/nginx/conf.d/cdp_apikey.conf
+      - ./docker/nginx/cdp_apikey.conf.template:/etc/nginx/templates/cdp_apikey.conf.template:ro
       - ./docker/nginx/html:/usr/share/nginx/html:ro
       # Data Agent 控制台：由 frontend 服务生产构建产出，写入 frontend_dist 卷，nginx 托管于 /console/
       - frontend_dist:/usr/share/nginx/console:ro
@@ -250,6 +255,8 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_API_BASE: ${DEEPSEEK_API_BASE:-https://api.deepseek.com}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      # CDP API Key 鉴权：非空时校验所有请求的 X-API-Key 头（health/docs 放行）。
+      CDP_API_KEY: ${CDP_API_KEY:-}
       ROOT_PATH: "/SQL Engine"
       # 可视化编排 Pipelines 对接的真实调度器（Apache Airflow）
       AIRFLOW_API_URL: http://airflow:8080/api/v1

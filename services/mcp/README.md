@@ -38,6 +38,16 @@ bash scripts/apply_migrations.sh
 
 环境变量：`SQL_ENGINE_URL`（默认 `http://localhost:8002`）、`CDP_TENANT_ID`（默认 1001）、`MCP_LOG_DIR`（默认 `services/mcp/logs`）。
 
+## `/cdp` 技能（推荐入口）
+
+除了直接对话触发 MCP 工具，项目内置了一个 Claude Code 技能 **`services/mcp/skills/cdp/SKILL.md`**，把上述工具按工作流编排好。
+
+- **底层就是这套 MCP 工具**——技能只提供流程编排（先 `cdp_schema`→`cdp_validate`→`cdp_estimate`→翻译确认→保存走人工确认链路），不另起脚本、不绕权限。
+- **覆盖全部只读能力**：核心圈人闭环 + 平台/连接/统一/对象/客户/触达/协议/隐私/监控/设置十大模块的「意图→工具」对照表。
+- **用法**：在本项目目录的 Claude Code 里输入 `/cdp`，或直接问「上海、公司规模大于500、且关联用户带 VIP 标签的线索有多少？」即自动命中。
+
+> 前提：`cdp` MCP 已加载（`claude mcp list` 能看到）。改过 `.mcp.json` 后需重开 Claude Code，让 MCP 配置与技能一并生效。
+
 ## 查询日志
 
 每次查询自动记录到 `services/mcp/logs/mcp_queries.log`（5MB×3 轮转，已 gitignore）。
