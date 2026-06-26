@@ -79,6 +79,12 @@ export default function KnowledgePanel() {
     }
   }
   useEffect(() => { setOpenFolders(new Set()); load(); /* eslint-disable-line */ }, [tenant]);
+  // 轻量轮询：让对话里的「策展进上下文」近实时反映到面板（用户正在操作时跳过）
+  useEffect(() => {
+    const t = setInterval(() => { if (busy.size === 0 && !uploading) load(); }, 8000);
+    return () => clearInterval(t);
+    /* eslint-disable-line */
+  }, [tenant, busy, uploading]);
 
   // 按 folder 分组（保持后端返回顺序内的稳定分组）
   const folders = useMemo(() => {

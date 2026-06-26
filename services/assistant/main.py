@@ -33,6 +33,9 @@ DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 DEEPSEEK_API_BASE = os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com").rstrip("/")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 SQL_ENGINE_URL = os.getenv("SQL_ENGINE_URL", "http://sql-engine:8000").rstrip("/")
+# CDP API Key：sql-engine 配置 CDP_API_KEY 时所有请求须带 X-API-Key（直连不经网关，需自行注入）。
+CDP_API_KEY = os.getenv("CDP_API_KEY", "").strip()
+SQL_HEADERS = {"X-API-Key": CDP_API_KEY} if CDP_API_KEY else {}
 MCP_SERVER_PATH = os.getenv("MCP_SERVER_PATH", "/app/mcp/server.py")
 MCP_SQL_ENGINE_URL = os.getenv("MCP_SQL_ENGINE_URL", SQL_ENGINE_URL)
 
@@ -134,9 +137,9 @@ def _list_conversations(tenant_id: int, user_id: int | None, limit: int = 50) ->
 
 # ── 智能体定义 ──────────────────────────────────────────────────────────────
 AGENT_DEFS: dict[str, dict] = {
-    "data":    {"name": "数据查询", "desc": "查询底座数据：用户/线索/客户/订单/受众/标签/画像等"},
+    "data":    {"name": "数据查询", "desc": "查询底座数据(用户/线索/客户/订单/标签/画像)、圈人、**保存受众入库**、把知识纳入/移出 LLM 上下文"},
     "analyst": {"name": "分析",     "desc": "创建图表或看板、出指标分布（电商/线索/客户等）"},
-    "task":    {"name": "任务",     "desc": "发布/运行后台任务，如同步受众、导出、跑批"},
+    "task":    {"name": "任务",     "desc": "发布/运行后台批处理任务：数据同步、导出、跑批、调度（不含保存受众）"},
     "general": {"name": "通用",     "desc": "产品介绍、使用答疑、打开/前往/跳转到某功能页面（导航）、其它对话"},
 }
 
@@ -148,6 +151,9 @@ AGENT_SYSTEM: dict[str, str] = {
         "看某个用户→show_profile(one_id)；圈人群/想知道某人群规模→show_audience(query)；"
         "看某类对象的记录列表→show_table(object, query)。"
         "只有当用户问的是必须用文字回答的具体事实（如精确计数、对比、解释字段含义）时，才用 cdp_* 只读工具查询后用文字作答。"
+        "【写操作】用户说「把这批人/这个人群**存为/保存为**受众叫X」→ 调用 save_audience(name=X, query=人群描述)；"
+        "用户说「把…**纳入/移出上下文**（知识库）」→ 调用 curate_knowledge(query=关键词, in_context=true/false)。"
+        "save_audience 返回 need_clarification 时，把澄清问题转述给用户，不要硬存。"
         "当前 tenant_id 是 {tenant_id}，调用需要 tenant_id 的工具时务必带上。回答简洁，用用户的语言。"
     ),
     "analyst": (
@@ -157,7 +163,8 @@ AGENT_SYSTEM: dict[str, str] = {
         "建好后简要说明名称即可；图表会直接在对话中以卡片渲染，看板也会自动弹出查看器（无需让用户去别的页面）。回答简洁。"
     ),
     "task": (
-        "你是 AgenticDataHub 的「任务」智能体。用户要发布/运行后台任务（同步受众、导出、跑批等）时调用 `publish_task`。"
+        "你是 AgenticDataHub 的「任务」智能体。用户要发布/运行后台任务（数据同步、导出、跑批等）时调用 `publish_task`。"
+        "注意：若用户是想「**保存/存为受众**」而非跑批，请改用 `save_audience(name, query)`，不要用 publish_task。"
         "当前 tenant_id 是 {tenant_id}。回答简洁。"
     ),
     "general": (
@@ -320,12 +327,32 @@ SHOW_CHART_TOOL = {"type": "function", "function": {
 
 SHOW_TOOLS = [SHOW_PROFILE_TOOL, SHOW_AUDIENCE_TOOL, SHOW_TABLE_TOOL, SHOW_CHART_TOOL]
 
+# ── 写操作工具（高频，安全可回滚）─────────────────────────────────────────────
+SAVE_AUDIENCE_TOOL = {"type": "function", "function": {
+    "name": "save_audience",
+    "description": "把一句话描述的人群保存为受众（先 NL→候选DSL→校验，再落库）。用户说「存为/保存为…受众/人群」时调用。",
+    "parameters": {"type": "object", "properties": {
+        "name": {"type": "string", "description": "受众名称，如「高价值新客」"},
+        "query": {"type": "string", "description": "人群的一句话描述，如「近30天下过单且客单价大于500的用户」"},
+    }, "required": ["name", "query"]},
+}}
+CURATE_KNOWLEDGE_TOOL = {"type": "function", "function": {
+    "name": "curate_knowledge",
+    "description": "把知识库里的资料纳入/移出 LLM 上下文（策展）。用户说「把…纳入上下文/移出上下文」时调用。",
+    "parameters": {"type": "object", "properties": {
+        "query": {"type": "string", "description": "要策展的文件关键词或文件名，如「质检报告」「指标口径」"},
+        "in_context": {"type": "boolean", "description": "true=纳入上下文，false=移出。默认 true"},
+    }, "required": ["query"]},
+}}
+WRITE_TOOLS = [SAVE_AUDIENCE_TOOL, CURATE_KNOWLEDGE_TOOL]
+
 
 def _agent_tools(agent: str) -> list[dict]:
     """非 data 智能体的工具集（chat-native：均含 show_* 渲染卡片工具）。"""
     tools: list[dict] = list(SHOW_TOOLS)
     if agent == "task":
         tools += [PUBLISH_TASK_TOOL]
+    tools += WRITE_TOOLS  # 所有智能体都可保存受众/策展知识（兜底，防路由误判）
     return tools
 
 
@@ -341,6 +368,12 @@ def _local_exec(name: str, args: dict, tid: int):
     if name == "create_dashboard":
         r = create_dashboard_handler(tid, args.get("question", ""))
         return r, {"created": {"kind": "dashboard", "id": r["dashboard_id"], "title": r["title"], "path": r["path"]}}
+    if name == "save_audience":
+        r = save_audience_handler(tid, args.get("name", ""), args.get("query", ""))
+        return r, {}
+    if name == "curate_knowledge":
+        r = curate_knowledge_handler(tid, args.get("query", ""), args.get("in_context", True))
+        return r, {}
     if name == "open_page":
         path = (args.get("path") or "").strip()
         if path in PAGE_INDEX:
@@ -366,7 +399,7 @@ def _local_exec(name: str, args: dict, tid: int):
 def _complete_run_later(run_id: str, tenant_id: int, entry: dict) -> None:
     try:
         time.sleep(3)
-        with httpx.Client(timeout=30.0, trust_env=False) as client:
+        with httpx.Client(timeout=30.0, trust_env=False, headers=SQL_HEADERS) as client:
             client.post(f"{SQL_ENGINE_URL}/connections/reverse-etl/runs/{run_id}/complete",
                         params={"tenant_id": tenant_id})
         entry["status"] = "success"
@@ -375,7 +408,7 @@ def _complete_run_later(run_id: str, tenant_id: int, entry: dict) -> None:
 
 
 def publish_task_handler(tenant_id: int, task_name: str, source_object: str = "user") -> dict:
-    with httpx.Client(timeout=30.0, trust_env=False) as client:
+    with httpx.Client(timeout=30.0, trust_env=False, headers=SQL_HEADERS) as client:
         job = client.post(f"{SQL_ENGINE_URL}/connections/reverse-etl/jobs", params={"tenant_id": tenant_id},
                           json={"job_name": task_name, "source_object": source_object,
                                 "destination_id": "assistant-demo", "schedule_cron": "0 */15 * * * *",
@@ -392,7 +425,7 @@ def publish_task_handler(tenant_id: int, task_name: str, source_object: str = "u
 
 
 def create_chart_handler(tenant_id: int, question: str) -> dict:
-    with httpx.Client(timeout=40.0, trust_env=False) as c:
+    with httpx.Client(timeout=40.0, trust_env=False, headers=SQL_HEADERS) as c:
         spec = c.post(f"{SQL_ENGINE_URL}/analyst/charts/nl", params={"tenant_id": tenant_id},
                       json={"question": question}).json()
         saved = c.post(f"{SQL_ENGINE_URL}/analyst/charts", params={"tenant_id": tenant_id},
@@ -400,8 +433,43 @@ def create_chart_handler(tenant_id: int, question: str) -> dict:
     return {"chart_id": saved["id"], "title": saved["title"], "type": saved["type"], "source": saved["source"]}
 
 
+def save_audience_handler(tenant_id: int, name: str, query: str) -> dict:
+    with httpx.Client(timeout=45.0, trust_env=False, headers=SQL_HEADERS) as c:
+        draft = c.post(f"{SQL_ENGINE_URL}/agent/segment/draft",
+                       json={"tenant_id": tenant_id, "question": query}).json()
+        rule = draft.get("rule")
+        clar = draft.get("clarifications") or []
+        if not rule:
+            return {"saved": False, "need_clarification": clar or ["未能从描述中解析出筛选条件，请更具体描述对象与条件。"]}
+        code = f"seg_{int(time.time() * 1000) % 10**9:09d}"
+        resp = c.post(f"{SQL_ENGINE_URL}/agent/segment/confirm",
+                      json={"tenant_id": tenant_id, "segment_code": code,
+                            "segment_name": name or "未命名受众", "rule": rule})
+        if resp.status_code not in (200, 201):
+            return {"saved": False, "error": resp.text[:200]}
+    est = draft.get("estimate")
+    if isinstance(est, dict):
+        est = est.get("count")
+    return {"saved": True, "segment_code": code, "segment_name": name or "未命名受众",
+            "estimate": est, "echo": draft.get("echo")}
+
+
+def curate_knowledge_handler(tenant_id: int, query: str, in_context: bool = True) -> dict:
+    with httpx.Client(timeout=30.0, trust_env=False, headers=SQL_HEADERS) as c:
+        files = c.get(f"{SQL_ENGINE_URL}/kb/files",
+                      params={"tenant_id": tenant_id, "q": query}).json().get("files", [])
+        if not files:
+            return {"ok": False, "error": f"知识库没有匹配「{query}」的文件"}
+        touched = []
+        for f in files[:20]:
+            c.post(f"{SQL_ENGINE_URL}/kb/files/{f['id']}/context",
+                   json={"tenant_id": tenant_id, "in_context": bool(in_context)})
+            touched.append(f["name"])
+    return {"ok": True, "in_context": bool(in_context), "count": len(touched), "files": touched}
+
+
 def create_dashboard_handler(tenant_id: int, question: str) -> dict:
-    with httpx.Client(timeout=40.0, trust_env=False) as c:
+    with httpx.Client(timeout=40.0, trust_env=False, headers=SQL_HEADERS) as c:
         spec = c.post(f"{SQL_ENGINE_URL}/analyst/dashboards/nl", params={"tenant_id": tenant_id},
                       json={"question": question}).json()
         saved = c.post(f"{SQL_ENGINE_URL}/analyst/dashboards", params={"tenant_id": tenant_id},
@@ -578,7 +646,7 @@ async def chat(req: ChatRequest) -> dict:
                     global _TOOL_SCHEMA_CACHE
                     _TOOL_SCHEMA_CACHE = [_mcp_tool_to_function(t) for t in mcp_list]
                     names = {t.name for t in mcp_list}
-                    tools = _TOOL_SCHEMA_CACHE + SHOW_TOOLS  # data 也可渲染内联卡片
+                    tools = _TOOL_SCHEMA_CACHE + SHOW_TOOLS + WRITE_TOOLS  # data 也可渲染卡片 + 写操作
 
                     async def execute(name, args):
                         res, meta = _local_exec(name, args, tid)
