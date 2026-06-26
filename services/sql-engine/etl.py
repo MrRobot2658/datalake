@@ -123,17 +123,32 @@ class EtlService:
 
     # ── 执行导入 ──────────────────────────────────────────────────────────
     def run_import(self, tenant_id: int, target_object: str, source: dict,
-                   mapping: list[dict], link: dict | None = None) -> dict:
+                   mapping: list[dict], link: dict | None = None, govern: bool = False) -> dict:
         self.validate_mapping(target_object, mapping)
         rows = self.read_rows(source)
         meta = OBJECT_REGISTRY[target_object]
         id_field = meta["id"]
+        gov = None
+        if govern:
+            from governance import GovernanceService
+            gov = GovernanceService(getattr(self.objects, "_executor", None))
         imported, relations, errors = 0, 0, []
+        suppressed, blocked = 0, 0
         for i, row in enumerate(rows):
             try:
                 rec = self.map_record(target_object, mapping, row)
                 if id_field not in rec:
                     raise ObjectError(f"缺少主键 {id_field}")
+                if gov is not None:
+                    g = gov.apply(tenant_id, target_object, rec)
+                    if g["status"] == "suppress":
+                        suppressed += 1
+                        continue
+                    if g["status"] == "block":
+                        blocked += 1
+                        errors.append({"row": i + 1, "error": f"治理阻断：{g['reason']}"})
+                        continue
+                    rec = g["record"]
                 self.objects.upsert_object(tenant_id, target_object, rec)
                 imported += 1
                 # 可选：为该行建立关系（导入行主键 → dst）
@@ -151,6 +166,9 @@ class EtlService:
             "total_rows": len(rows),
             "imported": imported,
             "relations": relations,
+            "suppressed": suppressed,
+            "blocked": blocked,
+            "governed": bool(gov is not None),
             "failed": len(errors),
             "errors": errors[:20],
         }

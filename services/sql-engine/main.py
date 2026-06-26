@@ -408,7 +408,8 @@ def etl_import(body: EtlRequest):
         return etl_service.run_import(
             body.tenant_id, body.target_object, body.source.model_dump(),
             [m.model_dump() for m in body.mapping],
-            body.link.model_dump() if body.link else None)
+            body.link.model_dump() if body.link else None,
+            govern=body.govern)
     except ObjectError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -225,6 +225,7 @@ class EtlRequest(BaseModel):
     mapping: list[EtlFieldMap] = Field(default_factory=list)
     link: EtlLink | None = None
     limit_preview: int = Field(5, ge=1, le=50)
+    govern: bool = Field(False, description="入库前治理钩子：抑制名单跳过 + PII 哈希/打码/阻断")
 
 
 class RelationAddRequest(BaseModel):
