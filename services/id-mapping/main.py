@@ -37,6 +37,8 @@ REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
 REDIS_TTL = int(os.getenv("REDIS_TTL_SECONDS", "2592000"))
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_TOPICS = [t.strip() for t in os.getenv("KAFKA_TOPICS", "tenant-1001-events").split(",") if t.strip()]
+# 入库前治理：抑制名单跳过（默认开，合规；命中即不合并/不存储。空名单时为 no-op）
+GOVERN_SUPPRESSION = os.getenv("GOVERN_SUPPRESSION", "1") not in ("0", "false", "False", "")
 
 CHANNEL_TYPES = {
     "wechat_openid", "wechat_unionid", "wework_extid", "form_id", "phone", "email", "device",
@@ -88,6 +90,21 @@ class IdMappingService:
             yield conn
         finally:
             conn.close()
+
+    def _suppressed(self, tenant_id: int, values: list) -> bool:
+        """事件标识（channel_id + link_keys 值）命中 suppression_list → True。降级放行。"""
+        vals = list({str(v) for v in values if v not in (None, "")})
+        if not vals:
+            return False
+        try:
+            ph = ",".join(["%s"] * len(vals))
+            with self.db() as conn, conn.cursor() as cur:
+                cur.execute(
+                    f"SELECT 1 FROM suppression_list WHERE tenant_id=%s AND identifier IN ({ph}) LIMIT 1",
+                    (tenant_id, *vals))
+                return cur.fetchone() is not None
+        except Exception:  # noqa: BLE001
+            return False
 
     def _channel_key(self, tenant_id: int, channel_type: str, channel_id: str) -> str:
         return f"channel:{tenant_id}:{channel_type}:{channel_id}"
@@ -374,6 +391,14 @@ class IdMappingService:
         tenant_id = event.tenant_id
         channel_type = event.channel_type
         channel_id = event.channel_id
+
+        # 0. 入库前治理：抑制名单（GDPR 删除/抑制）—— 命中即跳过，不合并/不存储
+        if GOVERN_SUPPRESSION:
+            ids = [channel_id, *(event.link_keys or {}).values()]
+            if self._suppressed(tenant_id, ids):
+                return {"action": "suppressed", "tenant_id": tenant_id,
+                        "channel_type": channel_type, "channel_id": channel_id,
+                        "one_id": None, "reason": "命中抑制名单（已跳过 OneID 合并与画像写入）"}
 
         # 1. Redis 热层查询
         one_id = self.get_one_id_from_redis(tenant_id, channel_type, channel_id)
