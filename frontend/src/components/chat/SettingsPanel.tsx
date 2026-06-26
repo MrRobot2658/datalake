@@ -12,6 +12,9 @@ import PipelinePanel from "./PipelinePanel";
 
 type Tab = "data" | "apps" | "pipeline" | "queue" | "tasks" | "kb" | "memory" | "skills" | "mcp" | "usage";
 
+// 这些 tab 的内容面板自带标题，设置头部不再重复显示标题
+const PANEL_TABS = new Set<Tab>(["data", "apps", "pipeline", "queue", "tasks", "kb"]);
+
 export default function SettingsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { tr } = useLang();
   const [tab, setTab] = useState<Tab>("data");
@@ -80,7 +83,8 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
         {/* 内容 */}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <span className="text-sm font-semibold text-gray-900">{tabs.find((t) => t.key === tab)?.label}</span>
+            {/* 面板自带标题的 tab 不再重复显示标题，避免标题重复 */}
+            <span className="text-sm font-semibold text-gray-900">{PANEL_TABS.has(tab) ? "" : tabs.find((t) => t.key === tab)?.label}</span>
             <button type="button" onClick={onClose} className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><X className="h-4 w-4" /></button>
           </div>
           <div className="flex-1 overflow-y-auto p-4">
