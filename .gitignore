@@ -16,3 +16,4 @@ services/mcp/logs/
 
 # 高保真 PPT 截图（由 scripts/shoot_ppt.mjs 重新生成）
 ppt/images/
+.vercel
