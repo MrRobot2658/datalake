@@ -9,14 +9,14 @@
 <body>
 <div class="layout">
   <aside>
-    <div class="brand">
+    <a class="brand" href="index.html" title="返回官网" style="text-decoration:none">
       <div class="logo">Q</div>
       <div><h1>Quasar</h1></div>
-    </div>
+    </a>
     <div class="sub">多数据源计算存储智能代理</div>
     <nav>
       <div class="grp">开始</div>
-      <a href="index.html"><span class="num"></span>快速开始 Quickstart</a>
+      <a href="product.html"><span class="num"></span>快速开始 Quickstart</a>
       <a href="architecture.html" class="active"><span class="num"></span>架构总览</a>
       <a href="install.html"><span class="num"></span>安装与使用</a>
       <div class="grp">功能模块</div>
@@ -45,7 +45,7 @@
     </nav>
   </aside>
   <main>
-    <div class="crumb"><a href="index.html">Quasar</a> · 开始</div>
+    <div class="crumb"><a href="index.html">Quasar 官网</a> · <a href="product.html">产品介绍</a> · 开始</div>
     <div class="page-head">
       <span class="tag">平台底座 · 实时链路</span>
       <h2>架构总览</h2>
@@ -105,7 +105,7 @@
       <div class="callout"><b>LLM 绝不直出 SQL。</b> 圈人 / 查询走 <code>engine.py</code> 模板 + 参数绑定，或 <code>dsl.py</code> 的 validate → echo → compile → estimate 路径——候选 DSL 必须先过校验层（字段 / 操作符 / 关系 / 跳数）才会被展示或执行。存储经 <code>executor.py</code> 解耦，可用 <code>OLAP_BACKEND</code> 在 MySQL / Doris 间切换。</div>
     </section>
     <div class="pager">
-      <a href="index.html"><span class="dir">← 上一页</span>快速开始 Quickstart</a>
+      <a href="product.html"><span class="dir">← 上一页</span>快速开始 Quickstart</a>
       <a class="next" href="install.html"><span class="dir">下一页 →</span>安装与使用</a>
     </div>
     <footer>

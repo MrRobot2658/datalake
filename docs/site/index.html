@@ -3,133 +3,260 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Quasar 产品介绍 · Quasar 产品文档</title>
-<link rel="stylesheet" href="assets/style.css">
+<title>Quasar · 为 Agent 提供数据底座</title>
+<meta name="description" content="Quasar —— 多数据源计算存储智能代理。统一接入·OneID 归一·NL 圈人·语义融合，为 AI Agent 提供高质量数据底座。">
+<style>
+  :root{
+    --bg:#ffffff; --ink:#1c2434; --muted:#5b6b86; --dim:#94a3b8;
+    --brand:#3c50e0; --brand2:#6577f3; --line:#e6eaf2; --soft:#f5f7ff; --soft2:#f8fafc;
+    --ok:#10b981; --radius:16px; --shadow:0 18px 40px -16px rgba(28,36,52,.22);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1160px;margin:0 auto;padding:0 24px}
+  /* nav */
+  header{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .nav{display:flex;align-items:center;gap:8px;height:64px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:18px}
+  .logo .mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:grid;place-items:center;color:#fff;font-size:16px;box-shadow:0 6px 16px rgba(60,80,224,.4)}
+  .menu{display:flex;align-items:center;gap:4px;margin-left:28px}
+  .menu>a,.dd>span{display:inline-flex;align-items:center;gap:5px;padding:8px 13px;border-radius:9px;font-size:14.5px;color:var(--muted);cursor:pointer}
+  .menu>a:hover,.dd:hover>span{background:var(--soft);color:var(--ink)}
+  .dd{position:relative}
+  .dd .caret{font-size:10px;color:var(--dim)}
+  .dd .panel{position:absolute;top:calc(100% + 8px);left:0;min-width:210px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:7px;opacity:0;visibility:hidden;transform:translateY(-6px);transition:.16s}
+  .dd:hover .panel{opacity:1;visibility:visible;transform:none}
+  .dd .panel a{display:flex;flex-direction:column;gap:1px;padding:9px 12px;border-radius:10px}
+  .dd .panel a:hover{background:var(--soft)}
+  .dd .panel .t{font-size:14px;font-weight:600;color:var(--ink)}
+  .dd .panel .d{font-size:12px;color:var(--dim)}
+  .spacer{flex:1}
+  .ghost{padding:8px 14px;border-radius:10px;font-size:14.5px;color:var(--muted)}
+  .ghost:hover{background:var(--soft);color:var(--ink)}
+  .cta{padding:9px 18px;border-radius:10px;background:var(--brand);color:#fff;font-weight:600;font-size:14.5px;box-shadow:0 8px 18px -6px rgba(60,80,224,.6)}
+  .cta:hover{background:#3343c4}
+  /* hero */
+  .hero{padding:74px 0 50px;background:radial-gradient(900px 420px at 50% -120px,#eaeefc 0,transparent 70%)}
+  .hero .tag{display:inline-block;font-size:13px;color:var(--brand);background:var(--soft);border:1px solid var(--line);padding:6px 14px;border-radius:999px;margin-bottom:20px}
+  .hero h1{font-size:50px;line-height:1.12;margin:0 0 18px;letter-spacing:-.5px}
+  .hero h1 .g{background:linear-gradient(120deg,var(--brand),var(--brand2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{font-size:18.5px;color:var(--muted);max-width:760px;margin:0 auto 28px}
+  .hero .ctas{display:flex;gap:13px;justify-content:center;flex-wrap:wrap}
+  .btn-lg{padding:13px 26px;border-radius:12px;font-size:15.5px;font-weight:600}
+  .btn-pri{background:var(--brand);color:#fff;box-shadow:0 12px 26px -8px rgba(60,80,224,.6)}
+  .btn-pri:hover{background:#3343c4}
+  .btn-sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .btn-sec:hover{border-color:var(--brand);color:var(--brand)}
+  .center{text-align:center}
+  .heroshot{margin:46px auto 0;max-width:1020px}
+  .heroshot img{width:100%;border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);display:block}
+  /* stats */
+  .stats{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin:42px 0 8px}
+  .stat{flex:1;min-width:160px;background:var(--soft2);border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:center}
+  .stat b{display:block;font-size:26px;color:var(--brand)}
+  .stat span{font-size:13px;color:var(--muted)}
+  /* sections */
+  section{padding:62px 0}
+  .eyebrow{font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--brand)}
+  h2.sec{font-size:34px;margin:8px 0 10px;letter-spacing:-.3px}
+  .sec-lead{font-size:17px;color:var(--muted);max-width:720px}
+  .feat{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;margin-top:38px}
+  .feat.rev .txt{order:2}
+  .feat .txt h3{font-size:23px;margin:0 0 10px}
+  .feat .txt p{color:var(--muted);margin:0 0 14px}
+  .feat .txt ul{margin:0;padding-left:18px;color:var(--muted)}
+  .feat .txt li{margin:6px 0}
+  .feat .shot img{width:100%;border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);display:block}
+  .pill{display:inline-block;font-size:12.5px;color:var(--brand);background:var(--soft);border:1px solid var(--line);padding:4px 11px;border-radius:999px;margin-bottom:14px}
+  /* scenario cards */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px}
+  .scard{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:#fff;box-shadow:0 2px 8px rgba(28,36,52,.05);transition:.16s;display:block}
+  .scard:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--brand)}
+  .scard img{width:100%;display:block;border-bottom:1px solid var(--line)}
+  .scard .b{padding:15px 16px}
+  .scard h4{margin:0 0 5px;font-size:16px}
+  .scard p{margin:0;font-size:13.5px;color:var(--muted)}
+  /* semantic band */
+  .band{background:linear-gradient(120deg,#0f1630,#1b2350);color:#fff;border-radius:22px;padding:48px 44px;margin:0 24px;max-width:1160px;margin-left:auto;margin-right:auto}
+  .band .eyebrow{color:#9fb0ff}
+  .band h2{font-size:30px;margin:8px 0 12px}
+  .band p{color:#c3cce6;max-width:760px;margin:0 0 18px}
+  .band .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px}
+  .band .node{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:9px;padding:7px 12px}
+  .band .arr{color:#9fb0ff;font-weight:700}
+  .band a.btn-lg{margin-top:22px;display:inline-block}
+  /* final cta */
+  .final{text-align:center;padding:78px 0}
+  .final h2{font-size:36px;margin:0 0 12px}
+  .final p{color:var(--muted);font-size:17px;margin:0 0 26px}
+  footer{border-top:1px solid var(--line);padding:34px 0;color:var(--dim);font-size:13.5px}
+  .fcols{display:flex;flex-wrap:wrap;gap:30px;justify-content:space-between}
+  .fcols a{color:var(--muted)}.fcols a:hover{color:var(--brand)}
+  @media(max-width:860px){
+    .menu,.ghost{display:none}
+    .hero h1{font-size:34px}.feat,.grid3{grid-template-columns:1fr}.feat.rev .txt{order:0}
+  }
+</style>
 </head>
 <body>
-<div class="layout">
-  <aside>
-    <div class="brand">
-      <div class="logo">Q</div>
-      <div><h1>Quasar</h1></div>
-    </div>
-    <div class="sub">多数据源计算存储智能代理</div>
-    <nav>
-      <div class="grp">开始</div>
-      <a href="index.html" class="active"><span class="num"></span>快速开始 Quickstart</a>
-      <a href="architecture.html"><span class="num"></span>架构总览</a>
-      <a href="install.html"><span class="num"></span>安装与使用</a>
-      <div class="grp">功能模块</div>
-      <a href="overview.html"><span class="num">⌂</span>总览看板</a>
-      <a href="01-connections.html"><span class="num">01</span>连接 Connections</a>
-      <a href="02-unify.html"><span class="num">02</span>统一 Unify</a>
-      <a href="03-objects.html"><span class="num">03</span>对象 Objects</a>
-      <a href="04-accounts.html"><span class="num">04</span>客户 Accounts</a>
-      <a href="05-engage.html"><span class="num">05</span>触达 Engage</a>
-      <a href="06-protocols.html"><span class="num">06</span>协议 Protocols</a>
-      <a href="07-privacy.html"><span class="num">07</span>隐私 Privacy</a>
-      <a href="08-monitor.html"><span class="num">08</span>监控 Monitor</a>
-      <a href="09-settings.html"><span class="num">09</span>设置 Settings</a>
-      <a href="10-knowledge.html"><span class="num">10</span>知识库 Knowledge</a>
-      <a href="11-apps.html"><span class="num">11</span>应用 Apps</a>
-      <a href="12-analyst.html"><span class="num">12</span>分析 Analyst</a>
-      <a href="semantic.html"><span class="num">✺</span>语义层 Semantic</a>
-      <div class="grp">智能 & 平台</div>
-      <a href="assistant.html"><span class="num">✦</span>智能助手 Assistant</a>
-      <a href="auth.html"><span class="num">🔐</span>登录门禁 Auth</a>
-      <div class="grp">场景与问答</div>
-      <a href="scenarios.html"><span class="num">🎯</span>场景与方案</a>
-      <a href="faq.html"><span class="num">❓</span>常见问答 FAQ</a>
-      <div class="grp">参考</div>
-      <a href="api.html"><span class="num">⌨</span>API & 数据表</a>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo" href="index.html"><span class="mark">Q</span>Quasar</a>
+    <nav class="menu">
+      <div class="dd">
+        <span>产品 <span class="caret">▼</span></span>
+        <div class="panel">
+          <a href="product.html"><span class="t">产品介绍</span><span class="d">完整功能文档 · 从安装到使用</span></a>
+          <a href="scenarios.html"><span class="t">场景与方案</span><span class="d">6 个真实落地案例</span></a>
+          <a href="semantic.html"><span class="t">语义层</span><span class="d">DB×KB 双源融合 · 归因链</span></a>
+          <a href="api.html"><span class="t">API 文档</span><span class="d">254+ 接口完整目录</span></a>
+          <a href="faq.html"><span class="t">常见问答</span><span class="d">部署 / 安全 / 规模</span></a>
+        </div>
+      </div>
+      <a href="architecture.html">架构</a>
+      <a href="install.html">安装</a>
+      <a href="scenarios.html">场景</a>
     </nav>
-  </aside>
-  <main>
-    <div class="page-head">
-      <span class="tag">产品介绍文档 · 从安装到使用</span>
-      <h2>Quasar — 为 Agent 提供数据底座</h2>
-      <p>多数据源计算存储智能代理：把散落各处的数据（数据库 / 数仓 / 数据湖 / 对象存储 / 消息 / API / 文件）<b>统一接入、自动清洗、灵活转化、高性能计算</b>，以 AI Agent 为自然语言入口，向上对 Agent 暴露结构化数据接口（OneID 画像宽表 / 圈人结果 / 聚合指标）。默认存储引擎 Apache Doris，支持计算存储分离与一体化部署。</p>
-      <div class="meta">
-        <span class="pill">🧱 1 平台底座 + 9 业务模块 + 3 扩展菜单</span>
-        <span class="pill">🔌 44 个主流连接器</span>
-        <span class="pill">🤖 41 个只读 MCP 工具</span>
-        <span class="pill">⚡ 实时 OneID 归一</span>
-        <span class="pill">🪄 NL 圈人 / 生成看板</span>
-        <span class="pill">🌬️ 真实 Airflow 调度</span>
-      </div>
+    <span class="spacer"></span>
+    <a class="ghost" href="https://github.com/MrRobot2658/Quasar" target="_blank">GitHub</a>
+    <a class="cta" href="product.html">在线体验 →</a>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="wrap center">
+    <span class="tag">多数据源计算存储智能代理</span>
+    <h1>为 Agent 提供<span class="g">数据底座</span></h1>
+    <p>Quasar 把散落在数据库 / 数仓 / 数据湖 / 消息 / API / 文件里的数据，统一接入、实时 OneID 归一、打宽成画像，并以 AI Agent 为自然语言入口——让上层 Agent 只管基于高质量数据决策。</p>
+    <div class="ctas">
+      <a class="btn-lg btn-pri" href="product.html">查看产品介绍</a>
+      <a class="btn-lg btn-sec" href="scenarios.html">看落地场景</a>
     </div>
-    <section>
-      <h3>产品界面</h3>
-      <p class="lead">登录即用的对话式控制台：左侧会话 · 中间智能助手（Ask / Agent）· 右侧数据底座 + 知识库。</p>
-      <figure class="fig"><img src="assets/shots/02-console.png" alt="Quasar 控制台主界面 · 对话 + 数据底座 + 知识库" loading="lazy"><figcaption>Quasar 控制台主界面 · 对话 + 数据底座 + 知识库</figcaption></figure>
-    </section>
-
-    <section>
-      <h3>5 分钟跑起来</h3>
-      <p class="lead">本地全栈即跑、登录即用。一条 <kbd>docker compose</kbd> 起全部组件 + 前端生产构建。</p>
-      <pre><code><span class="cmt"># 0. 克隆</span>
-git clone https://github.com/MrRobot2658/Quasar.git
-cd Quasar
-
-<span class="cmt"># 1. 启动全栈（含前端构建）</span>
-docker compose up -d --build
-docker compose ps                       <span class="cmt"># 等待全部 healthy</span>
-bash scripts/apply_migrations.sh        <span class="cmt"># 应用增量迁移 + 演示数据</span>
-
-<span class="cmt"># 2. 灌入演示数据（多渠道合并模拟）</span>
-bash scripts/simulate_kafka.sh          <span class="cmt"># 走完整 Kafka 链路（含租户 1001/1002）</span>
-
-<span class="cmt"># 3. 打开控制台并登录</span>
-<span class="cmt">#    http://localhost:8080/console/  →  admin@acme.com / demo123</span></code></pre>
-      <div class="callout">详细安装选项（DeepSeek 配置 / 接真实 Doris / 规模模拟 / 访问入口 / 使用规则）见 <a href="install.html">安装与使用</a>；整体数据链路与组件端口见 <a href="architecture.html">架构总览</a>。</div>
-    </section>
-
-    <section>
-      <h3>按模块浏览</h3>
-      <p class="lead">控制台对标 <a href="https://www.twilio.com/docs/segment" target="_blank">Twilio Segment</a> 的信息架构：连接 → 用户 → 对象 → 客户 → 触达 → 协议 → 隐私 → 监控，并扩展知识库 / 应用 / 分析三个一级菜单。</p>
-      <div class="home-grid">
-      <a class="mod" href="01-connections.html"><div class="mh"><span class="mn">01</span><span class="mt">连接 Connections</span></div><p>数据接入 / ETL / 可视化编排管道 / 数仓 · 44 连接器</p></a>
-      <a class="mod" href="02-unify.html"><div class="mh"><span class="mn">02</span><span class="mt">统一 Unify</span></div><p>实时 ID-Mapping / OneID 归一 / 统一画像宽表</p></a>
-      <a class="mod" href="03-objects.html"><div class="mh"><span class="mn">03</span><span class="mt">对象 Objects</span></div><p>多对象模型 User/Lead/Account/Product/Store/Order</p></a>
-      <a class="mod" href="04-accounts.html"><div class="mh"><span class="mn">04</span><span class="mt">客户 Accounts</span></div><p>B2B 客户主数据与客户级画像</p></a>
-      <a class="mod" href="05-engage.html"><div class="mh"><span class="mn">05</span><span class="mt">触达 Engage</span></div><p>统一筛选器 + 自然语言圈人 · 受众激活</p></a>
-      <a class="mod" href="06-protocols.html"><div class="mh"><span class="mn">06</span><span class="mt">协议 Protocols</span></div><p>埋点计划 / 违规 / 转换（数据治理）</p></a>
-      <a class="mod" href="07-privacy.html"><div class="mh"><span class="mn">07</span><span class="mt">隐私 Privacy</span></div><p>PII 管控 / 同意管理 / GDPR 删除抑制</p></a>
-      <a class="mod" href="08-monitor.html"><div class="mh"><span class="mn">08</span><span class="mt">监控 Monitor</span></div><p>投递概览 / 告警 / 事件日志</p></a>
-      <a class="mod" href="09-settings.html"><div class="mh"><span class="mn">09</span><span class="mt">设置 Settings</span></div><p>工作区 / IAM / API 令牌 / 审计 / MCP</p></a>
-      <a class="mod" href="10-knowledge.html"><div class="mh"><span class="mn">10</span><span class="mt">知识库 Knowledge</span></div><p>云盘式多模态文件存储，可关联对象</p></a>
-      <a class="mod" href="11-apps.html"><div class="mh"><span class="mn">11</span><span class="mt">应用 Apps</span></div><p>应用市场：CRM / 广告 / 消息 / 分析</p></a>
-      <a class="mod" href="12-analyst.html"><div class="mh"><span class="mn">12</span><span class="mt">分析 Analyst</span></div><p>NL 一句话生成看板 / 图表下钻</p></a>
-      <a class="mod" href="semantic.html"><div class="mh"><span class="mn">✺</span><span class="mt">语义层 Semantic</span></div><p>DB×KB 双源融合：Entity Hub / 属性联邦 / 归因链</p></a>
-      </div>
-    </section>
-
-    <section>
-      <h3>全局能力</h3>
-      <div class="cards">
-        <div class="card"><h5><span class="ico">✦</span><a href="assistant.html">智能助手</a></h5><p>右上角常驻多智能体：数据查询(MCP) / 分析(建看板) / 任务 / 通用导航 + 主动式埋点 Copilot。</p></div>
-        <div class="card"><h5><span class="ico">🔐</span><a href="auth.html">登录门禁</a></h5><p>强制登录，团队成员即账号，挂在 workspace（租户）下。</p></div>
-        <div class="card"><h5><span class="ico">⌂</span><a href="overview.html">总览看板</a></h5><p>核心 KPI + 关键分布图表（可下钻）+ 快捷入口。</p></div>
-        <div class="card"><h5><span class="ico">⌨</span><a href="api.html">API &amp; 数据表</a></h5><p>模板查询 / NL 查询 / OneID 映射端点 + 核心表说明。</p></div>
-      </div>
-    </section>
-
-    <section>
-      <h3>场景与问答</h3>
-      <div class="cards">
-        <div class="card"><h5><span class="ico">🎯</span><a href="scenarios.html">场景与方案</a></h5><p>退款率归因、跨渠道 OneID 打通、一句话圈人激活、多源接入打宽、自助看板等真实案例。</p></div>
-        <div class="card"><h5><span class="ico">❓</span><a href="faq.html">常见问答 FAQ</a></h5><p>与传统 CDP/BI 的区别、部署形态、数据安全、数据源支持、规模上限等。</p></div>
-      </div>
-    </section>
-    <div class="pager">
-      <span style="flex:1"></span>
-      <a class="next" href="architecture.html"><span class="dir">下一页 →</span>架构总览</a>
-    </div>
-    <footer>
-      Quasar — 多数据源计算存储智能代理 · 控制台对标 Twilio Segment 信息架构 ·
-      文档基于 <code>docs/</code> 各模块设计整理生成。
-    </footer>
-  </main>
+    <div class="heroshot"><img src="assets/shots/02-console.png" alt="Quasar 控制台"></div>
+  </div>
 </div>
+
+<div class="wrap">
+  <div class="stats">
+    <div class="stat"><b>44</b><span>主流连接器</span></div>
+    <div class="stat"><b>41</b><span>只读 MCP 工具</span></div>
+    <div class="stat"><b>OneID</b><span>实时跨渠道归一</span></div>
+    <div class="stat"><b>Doris</b><span>存算分离 / 一体化</span></div>
+    <div class="stat"><b>Airflow</b><span>可视化编排真实调度</span></div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="wrap">
+  <div class="center" style="max-width:720px;margin:0 auto">
+    <div class="eyebrow">核心能力</div>
+    <h2 class="sec">对话即可操作的数据平台</h2>
+    <p class="sec-lead" style="margin:0 auto">控制台为对话形态：左侧会话 · 中间智能助手（Ask / Agent）· 右侧实时数据底座与知识库。</p>
+  </div>
+
+  <div class="feat">
+    <div class="txt">
+      <span class="pill">统一 Unify · OneID</span>
+      <h3>多渠道实时归一为统一画像</h3>
+      <p>小程序 / 企微 / 表单 / App 等多渠道事件实时合并为一个 OneID，打宽成画像宽表，向上提供可检索的用户档案与聚合指标。</p>
+      <ul><li>热映射 Redis &lt;5ms，审计与画像落库</li><li>右栏「数据底座」实时概览，点数字下钻</li></ul>
+    </div>
+    <div class="shot"><img src="assets/shots/03-data-foundation.png" alt="数据底座"></div>
+  </div>
+
+  <div class="feat rev">
+    <div class="txt">
+      <span class="pill">触达 Engage · 自然语言圈人</span>
+      <h3>一句话圈人，安全可控</h3>
+      <p>中文描述即可圈选人群，实时预估人数并预览生成的查询。LLM 绝不直出 SQL——候选 DSL 必须过校验层。</p>
+      <ul><li>多条件 / AND·OR / 跨对象多跳关联</li><li>预估 → 保存为受众 → 激活到下游</li></ul>
+    </div>
+    <div class="shot"><img src="assets/shots/05-chat.png" alt="自然语言圈人"></div>
+  </div>
+
+  <div class="feat">
+    <div class="txt">
+      <span class="pill">知识库 · 卡帕西 LLM 模式</span>
+      <h3>分域知识 + LLM 上下文策展</h3>
+      <p>上下文 = RAM、文件 = 磁盘：分域文件夹承载多模态资料，文档为主干，一键把文件/整域纳入 LLM 上下文，实时估算 token 预算。</p>
+      <ul><li>多模态：文档 / 图片 / 视频 / 音频 / 文件</li><li>可关联到对象记录，支撑归因分析</li></ul>
+    </div>
+    <div class="shot"><img src="assets/shots/04-knowledge.png" alt="知识库"></div>
+  </div>
+
+  <div class="feat rev">
+    <div class="txt">
+      <span class="pill">分析 Analyst · NL 生成看板</span>
+      <h3>说一句话，生成看板</h3>
+      <p>描述一句话即从白名单数据源受限选图生成看板/图表（LLM 不写 SQL），图表数据点可下钻明细。</p>
+      <ul><li>内置画像 / 转化率 ROI 看板</li><li>recharts 安全聚合，口径受控</li></ul>
+    </div>
+    <div class="shot"><img src="assets/shots/sc5.png" alt="NL 生成看板"></div>
+  </div>
+</section>
+
+<!-- SCENARIOS -->
+<section class="wrap">
+  <div class="center" style="max-width:720px;margin:0 auto">
+    <div class="eyebrow">落地场景</div>
+    <h2 class="sec">把数据变成业务决策</h2>
+    <p class="sec-lead" style="margin:0 auto">从语义归因、跨渠道打通到自助分析——每个场景都是真实产品截图。</p>
+  </div>
+  <div class="grid3">
+    <a class="scard" href="scenarios.html"><img src="assets/shots/sc1.png" alt="退款率归因"><div class="b"><h4>退款率异常一键归因</h4><p>语义层 + 知识库，定量到根因到建议</p></div></a>
+    <a class="scard" href="scenarios.html"><img src="assets/shots/sc2.png" alt="OneID 打通"><div class="b"><h4>跨渠道 OneID 打通</h4><p>渠道 ID 收敛为统一画像再精准圈人</p></div></a>
+    <a class="scard" href="scenarios.html"><img src="assets/shots/sc4.png" alt="多源接入"><div class="b"><h4>多源数据接入打宽</h4><p>44 连接器 + 可视化编排 + Airflow</p></div></a>
+  </div>
+  <div class="center" style="margin-top:26px"><a class="btn-lg btn-sec" href="scenarios.html">查看全部 6 个案例 →</a></div>
+</section>
+
+<!-- SEMANTIC BAND -->
+<section style="padding:30px 0 62px">
+  <div class="band">
+    <div class="eyebrow">语义层 Semantic</div>
+    <h2>当数据平台学会「理解」业务</h2>
+    <p>把数据库（结构化）与知识库（非结构化）在语义层融合：Entity Hub 实体中心 · 属性联邦 · 关系跨链，让 Agent 沿统一关系图构建完整归因链。</p>
+    <div class="flow">
+      <span class="node">用户</span><span class="arr">→</span>
+      <span class="node">退款</span><span class="arr">→</span>
+      <span class="node">SKU</span><span class="arr">→</span>
+      <span class="node">质检报告</span><span class="arr">→</span>
+      <span class="node">批次</span><span class="arr">→</span>
+      <span class="node">供应商质量趋势</span>
+    </div>
+    <a class="btn-lg btn-pri" href="semantic.html">了解语义融合 →</a>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<div class="final wrap">
+  <h2>本地全栈即跑，登录即用</h2>
+  <p>一条 <code>docker compose up</code> 起全栈；DeepSeek 驱动自然语言操作，候选 DSL 必过校验层。</p>
+  <div class="ctas center" style="display:flex;gap:13px;justify-content:center">
+    <a class="btn-lg btn-pri" href="install.html">安装与使用</a>
+    <a class="btn-lg btn-sec" href="product.html">产品介绍</a>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap fcols">
+    <div><strong>Quasar</strong> · 为 Agent 提供数据底座</div>
+    <div style="display:flex;gap:22px;flex-wrap:wrap">
+      <a href="product.html">产品介绍</a>
+      <a href="architecture.html">架构</a>
+      <a href="scenarios.html">场景</a>
+      <a href="semantic.html">语义层</a>
+      <a href="api.html">API</a>
+      <a href="faq.html">FAQ</a>
+      <a href="https://github.com/MrRobot2658/Quasar" target="_blank">GitHub</a>
+    </div>
+  </div>
+</footer>
+
 </body>
 </html>

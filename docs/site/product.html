@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quasar 产品介绍 · Quasar 产品文档</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a class="brand" href="index.html" title="返回官网" style="text-decoration:none">
+      <div class="logo">Q</div>
+      <div><h1>Quasar</h1></div>
+    </a>
+    <div class="sub">多数据源计算存储智能代理</div>
+    <nav>
+      <div class="grp">开始</div>
+      <a href="product.html" class="active"><span class="num"></span>快速开始 Quickstart</a>
+      <a href="architecture.html"><span class="num"></span>架构总览</a>
+      <a href="install.html"><span class="num"></span>安装与使用</a>
+      <div class="grp">功能模块</div>
+      <a href="overview.html"><span class="num">⌂</span>总览看板</a>
+      <a href="01-connections.html"><span class="num">01</span>连接 Connections</a>
+      <a href="02-unify.html"><span class="num">02</span>统一 Unify</a>
+      <a href="03-objects.html"><span class="num">03</span>对象 Objects</a>
+      <a href="04-accounts.html"><span class="num">04</span>客户 Accounts</a>
+      <a href="05-engage.html"><span class="num">05</span>触达 Engage</a>
+      <a href="06-protocols.html"><span class="num">06</span>协议 Protocols</a>
+      <a href="07-privacy.html"><span class="num">07</span>隐私 Privacy</a>
+      <a href="08-monitor.html"><span class="num">08</span>监控 Monitor</a>
+      <a href="09-settings.html"><span class="num">09</span>设置 Settings</a>
+      <a href="10-knowledge.html"><span class="num">10</span>知识库 Knowledge</a>
+      <a href="11-apps.html"><span class="num">11</span>应用 Apps</a>
+      <a href="12-analyst.html"><span class="num">12</span>分析 Analyst</a>
+      <a href="semantic.html"><span class="num">✺</span>语义层 Semantic</a>
+      <div class="grp">智能 & 平台</div>
+      <a href="assistant.html"><span class="num">✦</span>智能助手 Assistant</a>
+      <a href="auth.html"><span class="num">🔐</span>登录门禁 Auth</a>
+      <div class="grp">场景与问答</div>
+      <a href="scenarios.html"><span class="num">🎯</span>场景与方案</a>
+      <a href="faq.html"><span class="num">❓</span>常见问答 FAQ</a>
+      <div class="grp">参考</div>
+      <a href="api.html"><span class="num">⌨</span>API & 数据表</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="page-head">
+      <span class="tag">产品介绍文档 · 从安装到使用</span>
+      <h2>Quasar — 为 Agent 提供数据底座</h2>
+      <p>多数据源计算存储智能代理：把散落各处的数据（数据库 / 数仓 / 数据湖 / 对象存储 / 消息 / API / 文件）<b>统一接入、自动清洗、灵活转化、高性能计算</b>，以 AI Agent 为自然语言入口，向上对 Agent 暴露结构化数据接口（OneID 画像宽表 / 圈人结果 / 聚合指标）。默认存储引擎 Apache Doris，支持计算存储分离与一体化部署。</p>
+      <div class="meta">
+        <span class="pill">🧱 1 平台底座 + 9 业务模块 + 3 扩展菜单</span>
+        <span class="pill">🔌 44 个主流连接器</span>
+        <span class="pill">🤖 41 个只读 MCP 工具</span>
+        <span class="pill">⚡ 实时 OneID 归一</span>
+        <span class="pill">🪄 NL 圈人 / 生成看板</span>
+        <span class="pill">🌬️ 真实 Airflow 调度</span>
+      </div>
+    </div>
+    <section>
+      <h3>产品界面</h3>
+      <p class="lead">登录即用的对话式控制台：左侧会话 · 中间智能助手（Ask / Agent）· 右侧数据底座 + 知识库。</p>
+      <figure class="fig"><img src="assets/shots/02-console.png" alt="Quasar 控制台主界面 · 对话 + 数据底座 + 知识库" loading="lazy"><figcaption>Quasar 控制台主界面 · 对话 + 数据底座 + 知识库</figcaption></figure>
+    </section>
+
+    <section>
+      <h3>5 分钟跑起来</h3>
+      <p class="lead">本地全栈即跑、登录即用。一条 <kbd>docker compose</kbd> 起全部组件 + 前端生产构建。</p>
+      <pre><code><span class="cmt"># 0. 克隆</span>
+git clone https://github.com/MrRobot2658/Quasar.git
+cd Quasar
+
+<span class="cmt"># 1. 启动全栈（含前端构建）</span>
+docker compose up -d --build
+docker compose ps                       <span class="cmt"># 等待全部 healthy</span>
+bash scripts/apply_migrations.sh        <span class="cmt"># 应用增量迁移 + 演示数据</span>
+
+<span class="cmt"># 2. 灌入演示数据（多渠道合并模拟）</span>
+bash scripts/simulate_kafka.sh          <span class="cmt"># 走完整 Kafka 链路（含租户 1001/1002）</span>
+
+<span class="cmt"># 3. 打开控制台并登录</span>
+<span class="cmt">#    http://localhost:8080/console/  →  admin@acme.com / demo123</span></code></pre>
+      <div class="callout">详细安装选项（DeepSeek 配置 / 接真实 Doris / 规模模拟 / 访问入口 / 使用规则）见 <a href="install.html">安装与使用</a>；整体数据链路与组件端口见 <a href="architecture.html">架构总览</a>。</div>
+    </section>
+
+    <section>
+      <h3>按模块浏览</h3>
+      <p class="lead">控制台对标 <a href="https://www.twilio.com/docs/segment" target="_blank">Twilio Segment</a> 的信息架构：连接 → 用户 → 对象 → 客户 → 触达 → 协议 → 隐私 → 监控，并扩展知识库 / 应用 / 分析三个一级菜单。</p>
+      <div class="home-grid">
+      <a class="mod" href="01-connections.html"><div class="mh"><span class="mn">01</span><span class="mt">连接 Connections</span></div><p>数据接入 / ETL / 可视化编排管道 / 数仓 · 44 连接器</p></a>
+      <a class="mod" href="02-unify.html"><div class="mh"><span class="mn">02</span><span class="mt">统一 Unify</span></div><p>实时 ID-Mapping / OneID 归一 / 统一画像宽表</p></a>
+      <a class="mod" href="03-objects.html"><div class="mh"><span class="mn">03</span><span class="mt">对象 Objects</span></div><p>多对象模型 User/Lead/Account/Product/Store/Order</p></a>
+      <a class="mod" href="04-accounts.html"><div class="mh"><span class="mn">04</span><span class="mt">客户 Accounts</span></div><p>B2B 客户主数据与客户级画像</p></a>
+      <a class="mod" href="05-engage.html"><div class="mh"><span class="mn">05</span><span class="mt">触达 Engage</span></div><p>统一筛选器 + 自然语言圈人 · 受众激活</p></a>
+      <a class="mod" href="06-protocols.html"><div class="mh"><span class="mn">06</span><span class="mt">协议 Protocols</span></div><p>埋点计划 / 违规 / 转换（数据治理）</p></a>
+      <a class="mod" href="07-privacy.html"><div class="mh"><span class="mn">07</span><span class="mt">隐私 Privacy</span></div><p>PII 管控 / 同意管理 / GDPR 删除抑制</p></a>
+      <a class="mod" href="08-monitor.html"><div class="mh"><span class="mn">08</span><span class="mt">监控 Monitor</span></div><p>投递概览 / 告警 / 事件日志</p></a>
+      <a class="mod" href="09-settings.html"><div class="mh"><span class="mn">09</span><span class="mt">设置 Settings</span></div><p>工作区 / IAM / API 令牌 / 审计 / MCP</p></a>
+      <a class="mod" href="10-knowledge.html"><div class="mh"><span class="mn">10</span><span class="mt">知识库 Knowledge</span></div><p>云盘式多模态文件存储，可关联对象</p></a>
+      <a class="mod" href="11-apps.html"><div class="mh"><span class="mn">11</span><span class="mt">应用 Apps</span></div><p>应用市场：CRM / 广告 / 消息 / 分析</p></a>
+      <a class="mod" href="12-analyst.html"><div class="mh"><span class="mn">12</span><span class="mt">分析 Analyst</span></div><p>NL 一句话生成看板 / 图表下钻</p></a>
+      <a class="mod" href="semantic.html"><div class="mh"><span class="mn">✺</span><span class="mt">语义层 Semantic</span></div><p>DB×KB 双源融合：Entity Hub / 属性联邦 / 归因链</p></a>
+      </div>
+    </section>
+
+    <section>
+      <h3>全局能力</h3>
+      <div class="cards">
+        <div class="card"><h5><span class="ico">✦</span><a href="assistant.html">智能助手</a></h5><p>右上角常驻多智能体：数据查询(MCP) / 分析(建看板) / 任务 / 通用导航 + 主动式埋点 Copilot。</p></div>
+        <div class="card"><h5><span class="ico">🔐</span><a href="auth.html">登录门禁</a></h5><p>强制登录，团队成员即账号，挂在 workspace（租户）下。</p></div>
+        <div class="card"><h5><span class="ico">⌂</span><a href="overview.html">总览看板</a></h5><p>核心 KPI + 关键分布图表（可下钻）+ 快捷入口。</p></div>
+        <div class="card"><h5><span class="ico">⌨</span><a href="api.html">API &amp; 数据表</a></h5><p>模板查询 / NL 查询 / OneID 映射端点 + 核心表说明。</p></div>
+      </div>
+    </section>
+
+    <section>
+      <h3>场景与问答</h3>
+      <div class="cards">
+        <div class="card"><h5><span class="ico">🎯</span><a href="scenarios.html">场景与方案</a></h5><p>退款率归因、跨渠道 OneID 打通、一句话圈人激活、多源接入打宽、自助看板等真实案例。</p></div>
+        <div class="card"><h5><span class="ico">❓</span><a href="faq.html">常见问答 FAQ</a></h5><p>与传统 CDP/BI 的区别、部署形态、数据安全、数据源支持、规模上限等。</p></div>
+      </div>
+    </section>
+    <div class="pager">
+      <span style="flex:1"></span>
+      <a class="next" href="architecture.html"><span class="dir">下一页 →</span>架构总览</a>
+    </div>
+    <footer>
+      Quasar — 多数据源计算存储智能代理 · 控制台对标 Twilio Segment 信息架构 ·
+      文档基于 <code>docs/</code> 各模块设计整理生成。
+    </footer>
+  </main>
+</div>
+</body>
+</html>
